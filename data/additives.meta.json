@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-11-03",
+  "source": "https://static.openfoodfacts.org/data/taxonomies/additives.json",
+  "additives": 546,
+  "preservatives": 71,
+  "unscored": 0,
+  "curated": 338,
+  "class_based": 208
+}

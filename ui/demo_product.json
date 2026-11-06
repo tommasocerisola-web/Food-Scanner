@@ -1,0 +1,36 @@
+{
+  "code": "3017620422003",
+  "product_name": "Crema alle nocciole (demo)",
+  "product_name_it": "Crema alle nocciole (demo)",
+  "brands": "Demo Lab",
+  "quantity": "350 g",
+  "categories_tags": [
+    "en:spreads",
+    "en:hazelnut-spreads",
+    "en:chocolate-spreads",
+    "en:sweet-spreads"
+  ],
+  "labels_tags": [],
+  "ingredients_text_it": "Zucchero, olio di palma, nocciole 13%, cacao magro 7,4%, latte scremato in polvere 6,6%, siero di latte in polvere, emulsionanti: lecitina di soia (E322), mono- e digliceridi degli acidi grassi (E471), aromi.",
+  "additives_tags": ["en:e322", "en:e471"],
+  "ingredients": [
+    {"id": "en:e322", "percent_estimate": 0.5},
+    {"id": "en:e471", "percent_estimate": 0.2}
+  ],
+  "nutriments": {
+    "energy-kcal_100g": 539,
+    "energy-kj_100g": 2255,
+    "sugars_100g": 56.3,
+    "saturated-fat_100g": 10.6,
+    "salt_100g": 0.107,
+    "sodium_100g": 0.0428,
+    "fiber_100g": 0,
+    "proteins_100g": 6.3,
+    "fat_100g": 30.9,
+    "fruits-vegetables-nuts-estimate-from-ingredients_100g": 13
+  },
+  "nova_group": 4,
+  "nutriscore_grade": "e",
+  "nutrition_data_per": "100g",
+  "product_quantity_unit": "g"
+}

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>generic_01 · food score lab</title>
+  <meta name="description" content="UI di test per il motore di scoring alimentare generic_01.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <span>generic_01</span>
+      <span class="tag">v0.2 beta · food score lab</span>
+    </div>
+    <div class="topbar-actions">
+      <div class="version" id="engine-version">engine …</div>
+      <button type="button" id="contribute-button" class="contribute-button">+ Aggiungi foto</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="kicker">Motore reale · dati reali · niente fuffa</p>
+      <h1>Guarda <em>perché</em> un prodotto prende quel punteggio.</h1>
+      <p class="lede">
+        Scansiona un barcode da Open Food Facts oppure usa il prodotto demo offline.
+        Il risultato arriva dal motore di scoring, non da valori inventati dalla UI.
+      </p>
+
+      <form id="scan-form" class="scan-form" autocomplete="off">
+        <label class="sr-only" for="barcode">Barcode</label>
+        <input
+          id="barcode"
+          name="barcode"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          maxlength="14"
+          placeholder="3017620422003"
+          aria-describedby="barcode-hint"
+        >
+        <button type="submit" id="scan-button">Analizza</button>
+        <button type="button" id="demo-button" class="secondary">Demo offline</button>
+      </form>
+      <p class="hint" id="barcode-hint">
+        Prova:
+        <button type="button" class="link" data-barcode="3017620422003">Nutella</button> ·
+        <button type="button" class="link" data-barcode="5449000000996">Coca-Cola</button> ·
+        <button type="button" class="link" data-barcode="8076800195057">Pasta Barilla</button>
+      </p>
+    </section>
+
+    <div id="status" class="status hidden" role="status" aria-live="polite"></div>
+
+    <section id="result" class="result hidden" aria-live="polite">
+      <div class="product-head">
+        <img id="product-image" class="product-image hidden" alt="Foto del prodotto">
+        <div class="product-copy">
+          <p class="eyebrow" id="product-kind">Prodotto</p>
+          <h2 id="product-name">—</h2>
+          <p class="meta">
+            <span id="product-brand"></span>
+            <span id="product-barcode"></span>
+            <span id="product-quantity"></span>
+          </p>
+          <div class="badges" id="product-badges"></div>
+        </div>
+        <div class="score-ring" id="score-ring">
+          <div class="score-inner">
+            <strong id="score-value">—</strong>
+            <span class="score-max">/100</span>
+            <small id="score-grade"></small>
+          </div>
+        </div>
+      </div>
+
+      <div class="confidence-row">
+        <div><span>Confidenza</span><strong id="confidence">—</strong></div>
+        <div><span>Copertura additivi</span><strong id="additive-coverage">—</strong></div>
+        <div><span>Versione motore</span><strong id="result-version">—</strong></div>
+      </div>
+
+      <div id="data-warning" class="data-warning hidden">
+        <div>
+          <strong>Dati incompleti</strong>
+          <p id="data-warning-text"></p>
+        </div>
+        <button type="button" id="data-warning-button" class="secondary">Aggiungi foto</button>
+      </div>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>Componenti</h3>
+          <div id="components" class="components"></div>
+        </section>
+        <section class="panel">
+          <h3>Allerte</h3>
+          <ul id="alerts" class="alerts"></ul>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h3>Perché</h3>
+        <ul id="reasons" class="reasons"></ul>
+      </section>
+
+      <section class="panel">
+        <h3>Additivi <span id="additives-count" class="count"></span></h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>E</th>
+                <th>Nome</th>
+                <th>Rischio</th>
+                <th>Dose</th>
+                <th>Perché</th>
+              </tr>
+            </thead>
+            <tbody id="additives-body"></tbody>
+          </table>
+        </div>
+        <p id="no-additives" class="empty hidden">Nessun additivo dichiarato.</p>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>Nutrienti <small>per 100 g/ml</small></h3>
+          <dl id="nutrients" class="nutrients"></dl>
+        </section>
+        <section class="panel">
+          <h3>Ingredienti</h3>
+          <p id="ingredients" class="ingredients">—</p>
+        </section>
+      </div>
+    </section>
+
+    <details class="panel manual">
+      <summary>Valuta un JSON Open Food Facts</summary>
+      <p>
+        Incolla un prodotto già scaricato (o un oggetto con <code>product</code>).
+        Utile per testare lo scoring senza rete.
+      </p>
+      <textarea id="json-input" spellcheck="false" placeholder='{"code": "12345678", "product_name": "Prodotto", "nutriments": {"energy-kcal_100g": 250}}'></textarea>
+      <div class="manual-actions">
+        <button type="button" id="json-button">Valuta JSON</button>
+        <button type="button" id="json-demo" class="secondary">Carica demo</button>
+      </div>
+    </details>
+  </main>
+
+  <dialog id="contribute-dialog" class="contribute-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">Open Food Facts</p>
+        <h2>Aiuta a completare il prodotto</h2>
+      </div>
+      <button type="button" id="contribute-close" class="icon-button" aria-label="Chiudi">×</button>
+    </div>
+
+    <p class="dialog-lede">
+      Scatta o scegli la foto generale del prodotto e quella della tabella nutrizionale.
+      Servono almeno 640×160 px; le foto vengono inviate a Open Food Facts con l'account
+      configurato sul server.
+    </p>
+
+    <div class="contribute-fields">
+      <label for="contribute-barcode">Barcode
+        <input id="contribute-barcode" type="text" inputmode="numeric" maxlength="14" placeholder="3017620422003">
+      </label>
+      <button type="button" id="scan-barcode-button" class="secondary">Scansiona barcode/QR</button>
+      <input type="file" id="scan-barcode-file" accept="image/*" capture="environment" hidden>
+    </div>
+
+    <div class="photo-grid">
+      <label class="photo-slot" for="front-file">
+        <span class="photo-label">Foto generale</span>
+        <input type="file" id="front-file" accept="image/*" capture="environment" hidden>
+        <img id="front-preview" class="photo-preview hidden" alt="Anteprima foto prodotto">
+        <span id="front-placeholder" class="photo-placeholder">Scatta o scegli una foto</span>
+      </label>
+      <label class="photo-slot" for="nutrition-file">
+        <span class="photo-label">Tabella nutrizionale</span>
+        <input type="file" id="nutrition-file" accept="image/*" capture="environment" hidden>
+        <img id="nutrition-preview" class="photo-preview hidden" alt="Anteprima tabella nutrizionale">
+        <span id="nutrition-placeholder" class="photo-placeholder">Scatta o scegli una foto</span>
+      </label>
+    </div>
+
+    <p id="off-credentials-note" class="dialog-note">Verifico la configurazione…</p>
+    <p id="contribute-status" class="status hidden" role="status" aria-live="polite"></p>
+
+    <div class="dialog-actions">
+      <button type="button" id="contribute-submit" disabled>Invia a Open Food Facts</button>
+      <a id="off-product-link" class="link" href="https://world.openfoodfacts.org/" target="_blank" rel="noopener">Apri la pagina OFF</a>
+    </div>
+  </dialog>
+
+  <footer>
+    <span>generic_01 · motore di scoring alimentare</span>
+    <span>UI di test, non un'app di produzione · solo standard library</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

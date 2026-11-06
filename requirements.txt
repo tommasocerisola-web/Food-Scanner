@@ -1,0 +1,4 @@
+# Nessuna dipendenza runtime: il motore usa solo la standard library
+# (urllib, sqlite3, csv, json). I test usano unittest, incluso in Python.
+#
+# Python 3.10+
