@@ -168,7 +168,7 @@ class ScoreResult:
     reasons: tuple[str, ...] = ()
     confidence: float = 1.0
     additive_coverage: float = 1.0
-    engine_version: str = "0.2-beta"
+    engine_version: str = "0.3-beta"
 
     @property
     def worst_additive(self) -> AdditiveHit | None:

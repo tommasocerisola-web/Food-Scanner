@@ -30,7 +30,7 @@ from data.curation import why_for_class  # noqa: E402
 from engine.additives import DEFAULT_RISK_BY_CLASS, FALLBACK_RISK  # noqa: E402
 
 TAXONOMY_URL = "https://static.openfoodfacts.org/data/taxonomies/additives.json"
-USER_AGENT = "generic_01-foodscore/0.2-beta (+https://github.com/tommasocerisola-web)"
+USER_AGENT = "generic_01-foodscore/0.3-beta (+https://github.com/tommasocerisola-web)"
 FIELDNAMES = [
     "e_number",
     "key",

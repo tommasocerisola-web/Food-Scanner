@@ -17,7 +17,7 @@ from typing import Any, Callable, Iterable
 
 DEFAULT_UPLOAD_URL = "https://world.openfoodfacts.org/cgi/product_image_upload.pl"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
-USER_AGENT = "generic_01-ui/0.2-beta (food score test UI)"
+USER_AGENT = "generic_01-ui/0.3-beta (food score test UI)"
 
 _FIELD_RE = re.compile(r"^(front|nutrition|ingredients|packaging|other)(_[a-z]{2})?$")
 _BARCODE_RE = re.compile(r"^\d{8,14}$")

@@ -24,7 +24,7 @@ from typing import Any, Callable, Iterable
 from .models import NutrientFacts, ProductRecord
 
 DEFAULT_BASE_URL = "https://world.openfoodfacts.org"
-DEFAULT_USER_AGENT = "generic_01-foodscore/0.2-beta (food scanner app; contact: owner)"
+DEFAULT_USER_AGENT = "generic_01-foodscore/0.3-beta (food scanner app; contact: owner)"
 
 # Campi richiesti: chiedere solo il necessario riduce payload e latenza.
 DEFAULT_FIELDS = ",".join(

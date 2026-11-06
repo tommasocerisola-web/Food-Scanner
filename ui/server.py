@@ -96,7 +96,7 @@ def _static_file(relative: str) -> Path | None:
 
 
 class ScoreHandler(BaseHTTPRequestHandler):
-    server_version = "generic_01-ui/0.2-beta"
+    server_version = "generic_01-ui/0.3-beta"
     engine: ScoreEngine
 
     def make_client(self) -> OFFClient:

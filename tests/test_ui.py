@@ -34,7 +34,7 @@ class ScoringTests(unittest.TestCase):
 
     def test_demo_produces_complete_result(self) -> None:
         result = score_payload(load_demo(), self.engine)
-        self.assertEqual(result["engine_version"], "0.2-beta")
+        self.assertEqual(result["engine_version"], "0.3-beta")
         self.assertIsInstance(result["score"], int)
         self.assertGreaterEqual(result["score"], 0)
         self.assertLessEqual(result["score"], 100)
@@ -88,6 +88,8 @@ class HttpTests(unittest.TestCase):
             body = response.read().decode("utf-8")
         self.assertEqual(response.status, 200)
         self.assertIn("text/html", response.headers.get("Content-Type", ""))
+        self.assertIn("Food Scanner", body)
+        self.assertIn("v0.3 beta", body)
         self.assertIn("food score lab", body)
         self.assertIn("/static/app.js", body)
 
@@ -102,7 +104,7 @@ class HttpTests(unittest.TestCase):
         status, payload = self._json("/api/health")
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["engine_version"], "0.2-beta")
+        self.assertEqual(payload["engine_version"], "0.3-beta")
         self.assertGreater(payload["additives"]["total"], 400)
         self.assertIn("contribute", payload)
         self.assertIsInstance(payload["contribute"]["configured"], bool)

@@ -1,9 +1,11 @@
-# generic_01 — motore di scoring alimentare (v0.2 beta)
+# Food Scanner — motore di scoring alimentare (v0.3 beta)
 
-> **0.2 beta** — UI con contributo foto a Open Food Facts: prodotto, tabella
-> nutrizionale, scansione barcode/QR e avviso sui dati incompleti.
+> **0.3 beta** — nuova interfaccia responsive con legenda del punteggio,
+> fotocamera per il barcode, riepilogo del risultato e contributo foto a Open
+> Food Facts. Include **100 test deterministici su prodotti italiani** e un
+> comando di collaudo live su **100 prodotti italiani reali**.
 
-Motore di scoring con **UI di test** minimale che legge un prodotto da **Open Food Facts** e
+Motore di scoring con **UI di test** che legge un prodotto da **Open Food Facts** e
 restituisce uno **score 0-100 spiegabile**, con una differenza sostanziale rispetto
 a Yuka: il rischio viene valutato **per singolo additivo**, non "a pacchetto".
 
@@ -123,13 +125,32 @@ python ui/server.py --host 0.0.0.0 --port 8000
 ```
 
 - **Barcode** → Open Food Facts + scoring (con cache e rate limiter del client).
+- **Fotocamera** → legge un barcode/QR dalla foto, dove il browser supporta `BarcodeDetector`.
 - **Demo offline** → `ui/demo_product.json`, utile senza rete.
 - **JSON manuale** → incolla un prodotto già scaricato e valuta solo lo scoring.
 
 Endpoint: `GET /api/health`, `GET /api/demo`, `GET /api/score?barcode=...`,
 `POST /api/score` con il JSON del prodotto. La UI mostra score, componenti,
-confidenza, allerte, additivi con rischio/dose e nutrienti per 100 g/ml.
-Non è un'app di produzione: è un banco di prova per il motore.
+confidenza, allerte, additivi con rischio/dose e nutrienti per 100 g/ml, con una
+legenda e un riepilogo in chiaro del risultato. Non è un'app di produzione: è un
+banco di prova per il motore.
+
+### Collaudo su 100 prodotti italiani
+
+Il test unitario `tests/test_italian_products.py` genera **100 prodotti italiani**
+deterministici (seed fisso, barcode EAN-13 unici, 20 bevande e 28 prodotti con
+additivi) e verifica le invarianti del motore senza rete.
+
+Per il collaudo su prodotti reali serve la connessione:
+
+```bash
+python tools/italian_sample.py --limit 100
+```
+
+Il comando scarica un campione casuale riproducibile di prodotti italiani da
+Open Food Facts, applica normalizzazione e scoring, controlla score, grade,
+confidenza, pesi e rischi degli additivi. Salva il report in
+`out/italian_sample.json` e termina con errore se una sola invariante non torna.
 
 ### Contribuire a Open Food Facts
 
@@ -262,10 +283,13 @@ tests/test_cross_source.py  test del confronto multi-fonte
 tests/test_merge.py         test del merger e degli adapter
 tests/test_ui.py            test della UI (server, demo, JSON, contributo)
 tests/test_off_upload.py    test dell'upload foto OFF
+tests/test_italian_products.py  100 prodotti italiani deterministici
+tools/italian_sample.py     collaudo live su 100 prodotti italiani reali
 ```
 
 ```bash
-python -m unittest discover -s tests -t .   # test, nessuna rete richiesta
+python -m unittest discover -s tests -t .   # 210 test, nessuna rete richiesta
+python tools/italian_sample.py --limit 100  # collaudo live, richiede rete
 ```
 
 ## Limiti noti

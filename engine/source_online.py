@@ -29,7 +29,7 @@ from .sources import SourceProduct
 OFF_BASE = "https://world.openfoodfacts.org"
 FDC_BASE = "https://api.nal.usda.gov/fdc/v1"
 PRICES_BASE = "https://prices.openfoodfacts.org"
-USER_AGENT = "generic_01-foodscore/0.2-beta (food scanner app; contact: owner)"
+USER_AGENT = "generic_01-foodscore/0.3-beta (food scanner app; contact: owner)"
 TIMEOUT = 25.0
 
 OFF_FIELDS = ",".join(

@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>generic_01 · food score lab</title>
-  <meta name="description" content="UI di test per il motore di scoring alimentare generic_01.">
+  <title>Food Scanner · v0.3 beta</title>
+  <meta name="description" content="Food Scanner: leggi un prodotto da Open Food Facts e scopri perché prende quel punteggio.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%234ade80'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%230b100e'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="dot" aria-hidden="true"></span>
-      <span>generic_01</span>
-      <span class="tag">v0.2 beta · food score lab</span>
+      <span class="brand-name">Food Scanner</span>
+      <span class="tag">v0.3 beta · food score lab</span>
     </div>
     <div class="topbar-actions">
       <div class="version" id="engine-version">engine …</div>
@@ -22,34 +23,79 @@
 
   <main>
     <section class="hero">
-      <p class="kicker">Motore reale · dati reali · niente fuffa</p>
-      <h1>Guarda <em>perché</em> un prodotto prende quel punteggio.</h1>
-      <p class="lede">
-        Scansiona un barcode da Open Food Facts oppure usa il prodotto demo offline.
-        Il risultato arriva dal motore di scoring, non da valori inventati dalla UI.
-      </p>
+      <div class="hero-layout">
+        <div class="hero-copy">
+          <p class="kicker">Dati reali · spiegazioni chiare · niente fuffa</p>
+          <h1>Il punteggio è solo l’inizio. <em>Guarda cosa c’è dietro.</em></h1>
+          <p class="lede">
+            Scansiona un barcode da Open Food Facts oppure usa la demo offline.
+            Food Scanner ti mostra nutrienti, additivi e lavorazione che hanno
+            prodotto quel risultato, non un numero calato dall’alto.
+          </p>
 
-      <form id="scan-form" class="scan-form" autocomplete="off">
-        <label class="sr-only" for="barcode">Barcode</label>
-        <input
-          id="barcode"
-          name="barcode"
-          type="text"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          maxlength="14"
-          placeholder="3017620422003"
-          aria-describedby="barcode-hint"
-        >
-        <button type="submit" id="scan-button">Analizza</button>
-        <button type="button" id="demo-button" class="secondary">Demo offline</button>
-      </form>
-      <p class="hint" id="barcode-hint">
-        Prova:
-        <button type="button" class="link" data-barcode="3017620422003">Nutella</button> ·
-        <button type="button" class="link" data-barcode="5449000000996">Coca-Cola</button> ·
-        <button type="button" class="link" data-barcode="8076800195057">Pasta Barilla</button>
-      </p>
+          <form id="scan-form" class="scan-form" autocomplete="off">
+            <div class="scan-row">
+              <label class="sr-only" for="barcode">Barcode</label>
+              <input
+                id="barcode"
+                name="barcode"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="14"
+                placeholder="3017620422003"
+                aria-describedby="barcode-hint"
+              >
+              <button type="submit" id="scan-button">Analizza</button>
+            </div>
+            <div class="scan-actions">
+              <button type="button" id="demo-button" class="secondary">Demo offline</button>
+              <button type="button" id="camera-button" class="secondary camera-button">
+                <span class="camera-icon" aria-hidden="true">⌁</span>
+                Scansiona con fotocamera
+              </button>
+              <input type="file" id="camera-file" accept="image/*" capture="environment" hidden>
+            </div>
+          </form>
+          <p class="hint" id="barcode-hint">
+            Prova:
+            <button type="button" class="link" data-barcode="3017620422003">Nutella</button> ·
+            <button type="button" class="link" data-barcode="5449000000996">Coca-Cola</button> ·
+            <button type="button" class="link" data-barcode="8076800195057">Pasta Barilla</button>
+          </p>
+        </div>
+
+        <aside class="hero-aside" aria-label="Come funziona Food Scanner">
+          <div class="aside-head">
+            <span class="eyebrow">In tre passaggi</span>
+            <span class="live-badge"><span class="live-dot" aria-hidden="true"></span>live</span>
+          </div>
+          <ol class="how-list">
+            <li>
+              <span class="step-number">01</span>
+              <div><strong>Scansiona</strong><span>Digita il barcode o inquadra la confezione.</span></div>
+            </li>
+            <li>
+              <span class="step-number">02</span>
+              <div><strong>Leggi</strong><span>Vedi score, componenti e motivazioni.</span></div>
+            </li>
+            <li>
+              <span class="step-number">03</span>
+              <div><strong>Confronta</strong><span>Capisci cosa pesa davvero, non solo il totale.</span></div>
+            </li>
+          </ol>
+          <div class="scale-block">
+            <div class="scale-head"><span class="eyebrow">Scala del punteggio</span><span>0–100</span></div>
+            <div class="score-scale" aria-label="Legenda del punteggio">
+              <span class="scale-item scale-great"><i></i>75–100 <b>Eccellente</b></span>
+              <span class="scale-item scale-good"><i></i>50–74 <b>Buono</b></span>
+              <span class="scale-item scale-warn"><i></i>25–49 <b>Scarso</b></span>
+              <span class="scale-item scale-bad"><i></i>0–24 <b>Pessimo</b></span>
+            </div>
+          </div>
+          <p class="aside-note">Il risultato non è un consiglio medico: è una lettura trasparente dei dati disponibili.</p>
+        </aside>
+      </div>
     </section>
 
     <div id="status" class="status hidden" role="status" aria-live="polite"></div>
@@ -66,6 +112,7 @@
             <span id="product-quantity"></span>
           </p>
           <div class="badges" id="product-badges"></div>
+          <p class="score-summary" id="score-summary"></p>
         </div>
         <div class="score-ring" id="score-ring">
           <div class="score-inner">
@@ -199,8 +246,8 @@
   </dialog>
 
   <footer>
-    <span>generic_01 · motore di scoring alimentare</span>
-    <span>UI di test, non un'app di produzione · solo standard library</span>
+    <span>Food Scanner · motore di scoring alimentare</span>
+    <span>v0.3 beta · UI di test, non un'app di produzione · solo standard library</span>
   </footer>
 
   <script src="/static/app.js"></script>

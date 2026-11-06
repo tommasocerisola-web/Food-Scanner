@@ -57,6 +57,19 @@ function scoreColor(score) {
   return "#f87171";
 }
 
+function scoreProfile(score) {
+  if (score >= 75) {
+    return { label: "Eccellente", tone: "great", text: "profilo nutrizionale favorevole e pochi punti critici." };
+  }
+  if (score >= 50) {
+    return { label: "Buono", tone: "good", text: "profilo equilibrato, con qualche aspetto da tenere d'occhio." };
+  }
+  if (score >= 25) {
+    return { label: "Scarso", tone: "warn", text: "diversi fattori pesano sul risultato: leggi le componenti e le allerte." };
+  }
+  return { label: "Pessimo", tone: "bad", text: "il prodotto accumula criticità importanti: controlla additivi, nutrienti e lavorazione." };
+}
+
 function riskClass(risk) {
   if (risk >= 70) return "high";
   if (risk >= 45) return "mid";
@@ -73,6 +86,7 @@ function setStatus(message, kind = "") {
 function setLoading(loading, label = "Analisi…") {
   $("scan-button").disabled = loading;
   $("demo-button").disabled = loading;
+  $("camera-button").disabled = loading;
   $("json-button").disabled = loading;
   $("json-demo").disabled = loading;
   $("contribute-submit").disabled = loading || !state.contributeConfigured;
@@ -267,6 +281,10 @@ function renderResult(payload) {
   ring.style.setProperty("--score-color", scoreColor(Number(result.score)));
   $("score-value").textContent = result.score;
   $("score-grade").textContent = String(result.grade || "").toUpperCase();
+  const profile = scoreProfile(Number(result.score));
+  const summary = $("score-summary");
+  summary.textContent = `${profile.label}: ${profile.text}`;
+  summary.className = `score-summary ${profile.tone}`;
 
   $("confidence").textContent = pct(result.confidence);
   $("additive-coverage").textContent = pct(result.additive_coverage);
@@ -389,30 +407,47 @@ function bindPhotoSlot(kind, inputId, previewId, placeholderId) {
   });
 }
 
+async function detectBarcode(file) {
+  if (!file) throw new Error("Nessuna immagine selezionata.");
+  if (!("BarcodeDetector" in window)) {
+    throw new Error("Questo browser non supporta la scansione automatica: inserisci il barcode a mano.");
+  }
+  const formats = ["ean_13", "ean_8", "upc_a", "upc_e", "qr_code"];
+  let supported = formats;
+  if (BarcodeDetector.getSupportedFormats) {
+    const available = await BarcodeDetector.getSupportedFormats();
+    supported = formats.filter((format) => available.includes(format));
+  }
+  if (!supported.length) throw new Error("Nessun formato barcode supportato da questo browser.");
+  const detector = new BarcodeDetector({ formats: supported });
+  const bitmap = await loadBitmap(file);
+  const codes = await detector.detect(bitmap);
+  if (!codes.length) throw new Error("Nessun barcode/QR riconosciuto. Riprova più vicino e con buona luce.");
+  const barcode = String(codes[0].rawValue || "").replace(/\D/g, "");
+  if (!/^\d{8,14}$/.test(barcode)) throw new Error("Il codice letto non sembra un barcode prodotto.");
+  return barcode;
+}
+
 async function handleScanPhoto(file) {
   if (!file) return;
-  if (!("BarcodeDetector" in window)) {
-    setContributeStatus("Questo browser non supporta la scansione automatica: inserisci il barcode a mano.", "info");
-    return;
-  }
   try {
-    const formats = ["ean_13", "ean_8", "upc_a", "upc_e", "qr_code"];
-    let supported = formats;
-    if (BarcodeDetector.getSupportedFormats) {
-      const available = await BarcodeDetector.getSupportedFormats();
-      supported = formats.filter((format) => available.includes(format));
-    }
-    if (!supported.length) throw new Error("Nessun formato barcode supportato da questo browser.");
-    const detector = new BarcodeDetector({ formats: supported });
-    const bitmap = await createImageBitmap(file);
-    const codes = await detector.detect(bitmap);
-    if (!codes.length) throw new Error("Nessun barcode/QR riconosciuto. Riprova più vicino.");
-    const barcode = String(codes[0].rawValue || "").replace(/\D/g, "");
-    if (!/^\d{8,14}$/.test(barcode)) throw new Error("Il codice letto non è un barcode prodotto.");
+    const barcode = await detectBarcode(file);
     $("contribute-barcode").value = barcode;
     setContributeStatus(`Barcode letto: ${barcode}`, "ok");
   } catch (error) {
     setContributeStatus(error.message || "Scansione non riuscita.", "error");
+  }
+}
+
+async function handleProductScan(file) {
+  if (!file) return;
+  setStatus("Leggo il barcode dalla foto…", "info");
+  try {
+    const barcode = await detectBarcode(file);
+    $("barcode").value = barcode;
+    await scanBarcode(barcode);
+  } catch (error) {
+    setStatus(error.message || "Scansione non riuscita.", "error");
   }
 }
 
@@ -540,6 +575,12 @@ document.addEventListener("DOMContentLoaded", () => {
     scanBarcode($("barcode").value);
   });
   $("demo-button").addEventListener("click", runDemo);
+  $("camera-button").addEventListener("click", () => $("camera-file").click());
+  $("camera-file").addEventListener("change", (event) => {
+    const file = event.target.files && event.target.files[0];
+    handleProductScan(file);
+    event.target.value = "";
+  });
   $("json-button").addEventListener("click", runManual);
   $("json-demo").addEventListener("click", loadDemoJson);
 

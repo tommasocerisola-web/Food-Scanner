@@ -27,7 +27,7 @@ from .models import (
     mean,
 )
 
-ENGINE_VERSION = "0.2-beta"
+ENGINE_VERSION = "0.3-beta"
 
 # --------------------------------------------------------------------------- #
 # Tabelle Nutri-Score (per 100 g)
