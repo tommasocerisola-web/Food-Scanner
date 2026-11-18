@@ -1,21 +1,21 @@
 """
-Adattatori multi-sorgente.
+Multi-source adapters.
 
-Ogni fonte (Open Food Facts, Yuka, una tabella EFSA, un export fatto a mano)
-parla un dialetto diverso: chiavi in italiano o inglese, punteggi su scale
-diverse, additivi come lista o stringa. Qui tutto viene normalizzato in
-`SourceProduct`, cosi' il confronto tra fonti lavora su un solo formato.
+Every source (Open Food Facts, Yuka, an EFSA table, a hand-made export) speaks a
+different dialect: keys in Italian or English, scores on different scales,
+additives as a list or a string. Everything is normalized into `SourceProduct`
+here, so the cross-source comparison works on a single format.
 
-Formati accettati:
-  * JSON: lista di prodotti, {"products": [...]}, {"product": {...}},
-    dizionario barcode -> prodotto;
-  * JSONL: una riga per prodotto;
-  * CSV/TSV: con intestazione, delimitatore riconosciuto automaticamente
-    (virgola, punto e virgola, tab).
+Accepted formats:
+  * JSON: list of products, {"products": [...]}, {"product": {...}},
+    barcode -> product dictionary;
+  * JSONL: one line per product;
+  * CSV/TSV: with a header, delimiter detected automatically
+    (comma, semicolon, tab).
 
-Uso:
+Usage:
     from engine.sources import load_source
-    prodotti = load_source("yuka", "export.json", score_max=100)
+    products = load_source("yuka", "export.json", score_max=100)
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from typing import Any
 
 from .additives import canonical
 
-# Alias accettati per i campi. Il primo che esiste vince.
+# Accepted aliases for the fields. The first one present wins.
 BARCODE_FIELDS = ("barcode", "code", "ean", "gtin", "gtin13", "gtin14", "codice", "id")
 NAME_FIELDS = ("product_name", "name", "title", "nome", "prodotto")
 BRAND_FIELDS = ("brands", "brand", "brand_name", "marca", "brands_tags")
@@ -43,7 +43,7 @@ INGREDIENT_FIELDS = ("ingredients_text", "ingredients", "ingredienti")
 
 @dataclass(frozen=True)
 class SourceProduct:
-    """Un prodotto visto da una fonte, ridotto ai campi confrontabili."""
+    """A product seen by one source, reduced to the comparable fields."""
 
     source: str
     barcode: str = ""
@@ -70,7 +70,7 @@ class SourceProduct:
         return self.name or self.barcode or "?"
 
     def to_dict(self) -> dict[str, Any]:
-        """Forma serializzabile, rileggibile da `load_source`."""
+        """Serializable form, readable back by `load_source`."""
         return {
             "source": self.source,
             "barcode": self.barcode,
@@ -95,7 +95,7 @@ class SourceProduct:
 
 
 # --------------------------------------------------------------------------- #
-# Normalizzazione testo / codici
+# Text / code normalization
 # --------------------------------------------------------------------------- #
 def norm_text(value: Any) -> str:
     """'Crème Brûlée & Co.' -> 'creme brulee and co'."""
@@ -107,15 +107,15 @@ def norm_text(value: Any) -> str:
 
 
 def name_key(name: str, brand: str = "") -> str:
-    """Chiave di confronto nome+marca, indipendente da accenti e punteggiatura."""
+    """Comparison key for name+brand, independent of accents and punctuation."""
     return " ".join(part for part in (norm_text(brand), norm_text(name)) if part)
 
 
 def barcode_key(barcode: str) -> str:
-    """Chiave barcode robusta: solo cifre, zeri iniziali ignorati.
+    """Robust barcode key: digits only, leading zeros ignored.
 
-    Gli EAN-8 (8 cifre) restano interi anche se iniziano per zero; sotto le 8
-    cifre il codice non e' un GTIN e non viene usato per il matching.
+    EAN-8 codes (8 digits) stay whole even when they start with zero; below 8
+    digits the code is not a GTIN and is not used for matching.
     """
     digits = re.sub(r"\D", "", str(barcode or ""))
     if len(digits) < 8:
@@ -125,10 +125,10 @@ def barcode_key(barcode: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Caricamento
+# Loading
 # --------------------------------------------------------------------------- #
 def load_source(name: str, path: Path | str, score_max: float = 100.0) -> list[SourceProduct]:
-    """Legge un export e restituisce i prodotti normalizzati della fonte."""
+    """Read an export and return the normalized products of the source."""
     text = Path(path).read_text(encoding="utf-8-sig", errors="replace")
     if not text.strip():
         return []
@@ -151,7 +151,7 @@ def _records_from_json(text: str) -> list[Any]:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
-        # JSONL: un oggetto per riga.
+        # JSONL: one object per line.
         records: list[Any] = []
         for line in text.splitlines():
             line = line.strip().rstrip(",")
@@ -174,8 +174,8 @@ def _records_from_payload(payload: Any) -> list[Any]:
             if isinstance(value, list):
                 return value
         if isinstance(payload.get("product"), dict):
-            # Il record esterno porta il barcode, quello interno i dettagli:
-            # _product_from_record li unisce.
+            # The outer record carries the barcode, the inner one the details:
+            # _product_from_record merges them.
             return [payload]
         if payload and all(isinstance(value, dict) for value in payload.values()):
             records = []
@@ -228,7 +228,7 @@ def _product_from_record(source: str, record: dict[str, Any], score_max: float) 
 
 
 # --------------------------------------------------------------------------- #
-# Nutrienti e campi estesi
+# Nutrients and extended fields
 # --------------------------------------------------------------------------- #
 NUTRIENT_ALIASES: dict[str, tuple[str, ...]] = {
     "kcal": ("kcal", "calories", "energy_kcal", "energy-kcal_100g", "energy-kcal", "energia_kcal"),
@@ -273,7 +273,7 @@ def _num(block: dict[str, Any], *keys: str) -> float | None:
 
 
 def _nutrients_from_block(block: dict[str, Any]) -> dict[str, float]:
-    """Accetta sia il blocco OFF (`sugars_100g`) sia chiavi canoniche (`sugars`)."""
+    """Accept both the OFF block (`sugars_100g`) and canonical keys (`sugars`)."""
     kcal = _num(block, "energy-kcal_100g", "energy-kcal", "kcal", "calories", "energia_kcal")
     if kcal is None:
         kj = _num(block, "energy-kj_100g", "energy_100g", "energy-kj", "energy", "energia_kj")
@@ -334,7 +334,7 @@ def _int(value: Any) -> int | None:
 
 
 def _unwrap(record: dict[str, Any]) -> dict[str, Any]:
-    """Appiattisce {"code": ..., "product": {...}} mantenendo i campi esterni."""
+    """Flatten {"code": ..., "product": {...}} while keeping the outer fields."""
     for key in ("product", "prodotto"):
         nested = record.get(key)
         if isinstance(nested, dict):

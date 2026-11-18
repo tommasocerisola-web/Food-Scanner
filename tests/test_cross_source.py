@@ -1,4 +1,4 @@
-"""Test del confronto multi-fonte: caricamento, matching, consenso, buchi."""
+"""Cross-source comparison tests: loading, matching, consensus, gaps."""
 from __future__ import annotations
 
 import contextlib
@@ -154,7 +154,7 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(len(clusters), 1)
         cluster = next(iter(clusters.values()))
         self.assertEqual(cluster.entries["yuka"].score, 38.0)
-        self.assertEqual(cluster.how, "barcode+nome")
+        self.assertEqual(cluster.how, "barcode+name")
 
     def test_different_products_stay_separate(self) -> None:
         clusters, _ = cluster_products(
@@ -177,7 +177,7 @@ class MatchingTests(unittest.TestCase):
         )
         self.assertEqual(len(clusters), 2)
         self.assertEqual(len(ambiguous), 1)
-        self.assertEqual(len(ambiguous[0]["candidati"]), 2)
+        self.assertEqual(len(ambiguous[0]["candidates"]), 2)
 
     def test_duplicate_barcode_counted(self) -> None:
         clusters, _ = cluster_products(
@@ -213,12 +213,12 @@ class ReportTests(unittest.TestCase):
         clusters, ambiguous = cluster_products(products)
         report = build_report(products, clusters, ambiguous, {name: Path(name) for name in products}, table)
 
-        self.assertEqual(report["in_comune"], 1)
-        self.assertEqual([row["tag"] for row in report["additivi_sconosciuti"]], ["e999"])
-        payload = report["prodotti"][0]
-        self.assertEqual(payload["manca_in"], [])
-        self.assertIn("additivi_discordanti", payload["flag"])
-        self.assertIn("additivi_sconosciuti:e999", payload["flag"])
+        self.assertEqual(report["shared"], 1)
+        self.assertEqual([row["tag"] for row in report["unknown_additives"]], ["e999"])
+        payload = report["products"][0]
+        self.assertEqual(payload["missing_in"], [])
+        self.assertIn("additives_conflict", payload["flags"])
+        self.assertIn("unknown_additives:e999", payload["flags"])
         self.assertEqual(payload["spread"], 20.0)
 
 
@@ -256,7 +256,7 @@ class MergeTablesTests(TempDirTest):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["risk_consensus"], 20.0)
         self.assertTrue(rows[0]["needs_fix"])
-        self.assertIn("punteggio mancante in una fonte", rows[0]["reasons"])
+        self.assertIn("score missing in one source", rows[0]["reasons"])
 
     def test_json_list_and_italian_headers(self) -> None:
         path = self.write("t.json", json.dumps([{"e": "322", "score": "55,5", "nome": "Lecitina"}]))
@@ -311,7 +311,7 @@ class CliTests(TempDirTest):
             )
         self.assertEqual(code, 0)
         report = json.loads(out.read_text(encoding="utf-8"))
-        self.assertEqual(report["in_comune"], 1)
+        self.assertEqual(report["shared"], 1)
         self.assertTrue(csv_out.exists())
 
         table_off = self.write("t_off.csv", "e_number,risk_score\nE322,20\n")

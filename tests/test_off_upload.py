@@ -1,4 +1,4 @@
-"""Test offline del caricamento foto su Open Food Facts."""
+"""Offline tests for the Open Food Facts photo upload."""
 from __future__ import annotations
 
 import os

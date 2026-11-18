@@ -1,12 +1,12 @@
 """
-Adapter di rete per le tre fonti, tutte raggiungibili senza chiave obbligatoria.
+Network adapters for the three sources, all reachable without a mandatory key.
 
-  * Open Food Facts — API v2 pubblica, prodotti e additivi;
-  * USDA FoodData Central — DEMO_KEY (30 richieste/ora) oppure FDC_API_KEY;
-  * Open Prices — API v1 pubblica, prezzo/negozio/data per barcode.
+  * Open Food Facts — public v2 API, products and additives;
+  * USDA FoodData Central — DEMO_KEY (30 requests/hour) or FDC_API_KEY;
+  * Open Prices — public v1 API, price/store/date per barcode.
 
-Ogni funzione restituisce `SourceProduct`, la stessa forma degli export offline:
-il merger non sa (e non deve sapere) da dove arrivano i dati.
+Every function returns `SourceProduct`, the same shape as the offline exports:
+the merger does not know (and must not know) where the data comes from.
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ SOURCES = ("off", "fdc", "openprices")
 
 
 class FetchError(Exception):
-    """Errore di rete, risposta inattesa o limite della fonte."""
+    """Network error, unexpected response or source limit."""
 
 
 # --------------------------------------------------------------------------- #
@@ -101,11 +101,11 @@ def _get_json(url: str, limiter: RateLimiter | None = None, attempts: int = 3) -
                 if attempt + 1 < attempts:
                     time.sleep(_retry_delay(error.headers, attempt))
                 continue
-            raise FetchError(f"HTTP {error.code} su {url.split('?', 1)[0]}") from error
+            raise FetchError(f"HTTP {error.code} on {url.split('?', 1)[0]}") from error
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             last = error
             time.sleep(min(8.0, 1.5 * (attempt + 1)))
-    raise FetchError(f"richiesta fallita su {url.split('?', 1)[0]} ({last})")
+    raise FetchError(f"request failed on {url.split('?', 1)[0]} ({last})")
 
 
 # --------------------------------------------------------------------------- #
@@ -158,11 +158,11 @@ def fdc_api_key() -> str:
 
 
 def fetch_fdc(gtin: str = "", name: str = "", brand: str = "") -> SourceProduct | None:
-    """Cerca il prodotto per nome e verifica il GTIN tra i candidati.
+    """Look the product up by name and verify the GTIN among the candidates.
 
-    L'API di FDC non accetta il barcode come query (restituisce 0 risultati), ma
-    ogni alimento branded espone `gtinUpc`: si cerca per nome/marca e si tiene
-    solo il candidato con lo stesso GTIN. Cosi' non si uniscono prodotti diversi.
+    The FDC API does not accept the barcode as a query (it returns 0 results),
+    but every branded food exposes `gtinUpc`: search by name/brand and keep only
+    the candidate with the same GTIN. That way different products are not merged.
     """
     target = gtin14(gtin)
     query = (name or brand or "").strip()
@@ -170,8 +170,8 @@ def fetch_fdc(gtin: str = "", name: str = "", brand: str = "") -> SourceProduct 
         return None
 
     api_key = fdc_api_key()
-    # Il nome OFF a volte e' un titolo commerciale ("12 Pack Hazelnut Spread..."):
-    # se la ricerca per nome non trova il GTIN, si riprova con la marca.
+    # The OFF name is sometimes a commercial title ("12 Pack Hazelnut Spread..."):
+    # if the name search misses the GTIN, retry with the brand.
     queries = [query]
     if brand and brand.strip().lower() != query.lower():
         queries.append(brand.strip())
@@ -203,15 +203,15 @@ def _fdc_search(query: str, api_key: str) -> Any:
         "pageSize": "50",
     }
     url = f"{FDC_BASE}/foods/search?{urllib.parse.urlencode(params)}"
-    # Con DEMO_KEY un 429 significa quota oraria esaurita: ritentare non serve.
+    # With DEMO_KEY a 429 means the hourly quota is gone: retrying is useless.
     attempts = 1 if api_key == "DEMO_KEY" else 3
     try:
         return _get_json(url, _FDC_LIMITER, attempts=attempts)
     except FetchError as error:
         if api_key == "DEMO_KEY":
             raise FetchError(
-                "USDA FDC: limite DEMO_KEY (30 richieste/ora). "
-                "Imposta FDC_API_KEY (gratuita su fdc.nal.usda.gov) per continuare."
+                "USDA FDC: DEMO_KEY limit (30 requests/hour). "
+                "Set FDC_API_KEY (free at fdc.nal.usda.gov) to continue."
             ) from error
         raise
 
@@ -343,7 +343,7 @@ def fetch_source(source: str, barcode: str, name: str = "", brand: str = "") -> 
         return fetch_fdc(gtin=barcode, name=name, brand=brand)
     if source == "openprices":
         return fetch_openprices(barcode)
-    raise ValueError(f"fonte sconosciuta: {source}")
+    raise ValueError(f"unknown source: {source}")
 
 
 def _number(value: Any) -> float | None:

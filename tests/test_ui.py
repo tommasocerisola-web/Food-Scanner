@@ -1,4 +1,4 @@
-"""Test offline della UI di test (nessuna rete)."""
+"""Offline tests for the test UI (no network)."""
 from __future__ import annotations
 
 import base64
@@ -155,7 +155,7 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self._get("/api/nope")
         self.assertEqual(ctx.exception.code, 404)
-        self.assertIn("non trovato", ctx.exception.read().decode("utf-8").lower())
+        self.assertIn("not found", ctx.exception.read().decode("utf-8").lower())
 
     def test_barcode_endpoint_with_fake_client(self) -> None:
         class FakeClient:

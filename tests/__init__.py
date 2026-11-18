@@ -1,1 +1,1 @@
-"""Rende importabile la cartella dei test (unittest discover)."""
+"""Makes the test folder importable (unittest discover)."""

@@ -94,7 +94,7 @@ public class MainActivity extends Activity {
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException ignored) {
-                    Toast.makeText(MainActivity.this, "Nessuna app per aprire il link.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "No app available to open the link.", Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
         try {
             File cameraDir = new File(getCacheDir(), "camera");
             if (!cameraDir.exists() && !cameraDir.mkdirs()) {
-                throw new IOException("Impossibile creare la cartella foto");
+                throw new IOException("Cannot create the photo folder");
             }
             File photo = File.createTempFile("foodscanner-", ".jpg", cameraDir);
             cameraOutputUri = FileProvider.getUriForFile(
@@ -149,17 +149,17 @@ public class MainActivity extends Activity {
             pick.addCategory(Intent.CATEGORY_OPENABLE);
             pick.setType("image/*");
 
-            Intent chooser = Intent.createChooser(pick, "Scegli una foto");
+            Intent chooser = Intent.createChooser(pick, "Choose a photo");
             chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{capture});
             startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
             return true;
         } catch (Exception error) {
-            Log.e(TAG, "Apertura fotocamera/galleria fallita", error);
+            Log.e(TAG, "Failed to open camera/gallery", error);
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(null);
                 filePathCallback = null;
             }
-            Toast.makeText(this, "Impossibile aprire fotocamera o galleria.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Cannot open the camera or the gallery.", Toast.LENGTH_SHORT).show();
             return false;
         }
     }
@@ -204,7 +204,7 @@ public class MainActivity extends Activity {
                     webView.loadUrl("http://" + SERVER_HOST + ":" + SERVER_PORT + "/");
                 });
             } catch (Throwable error) {
-                Log.e(TAG, "Avvio del server Python fallito", error);
+                Log.e(TAG, "Python server startup failed", error);
                 runOnUiThread(() -> showStartupError(error));
             }
         }, "foodscanner-start").start();
@@ -214,15 +214,15 @@ public class MainActivity extends Activity {
         progress.setVisibility(View.GONE);
         errorView.setVisibility(View.VISIBLE);
         errorView.setText(
-                "Food Scanner non è riuscito ad avviare il motore Python.\n\n"
+                "Food Scanner could not start the Python engine.\n\n"
                         + error.getClass().getSimpleName() + ": " + safeMessage(error)
-                        + "\n\nChiudi e riapri l'app. Se il problema resta, reinstalla l'APK."
+                        + "\n\nClose and reopen the app. If the problem persists, reinstall the APK."
         );
     }
 
     private String safeMessage(Throwable error) {
         String message = error.getMessage();
-        return message == null || message.isEmpty() ? "errore sconosciuto" : message;
+        return message == null || message.isEmpty() ? "unknown error" : message;
     }
 
     private void syncAssets(File appDir) throws IOException {
@@ -232,7 +232,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (appDir.exists() && !deleteTree(appDir)) {
-            throw new IOException("Impossibile aggiornare gli asset dell'app");
+            throw new IOException("Cannot update the app assets");
         }
         copyAssetTree("foodscanner", appDir);
         prefs.edit().putString("version", BuildConfig.VERSION_NAME).commit();
@@ -256,7 +256,7 @@ public class MainActivity extends Activity {
         String[] children = getAssets().list(assetPath);
         if (children != null && children.length > 0) {
             if (!target.exists() && !target.mkdirs()) {
-                throw new IOException("Impossibile creare " + target);
+                throw new IOException("Cannot create " + target);
             }
             for (String child : children) {
                 copyAssetTree(assetPath + "/" + child, new File(target, child));
@@ -266,7 +266,7 @@ public class MainActivity extends Activity {
 
         File parent = target.getParentFile();
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            throw new IOException("Impossibile creare " + parent);
+            throw new IOException("Cannot create " + parent);
         }
         try (InputStream input = getAssets().open(assetPath);
              OutputStream output = new FileOutputStream(target)) {

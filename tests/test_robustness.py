@@ -1,4 +1,4 @@
-"""Robustezza del motore: fuzz, casi limite, client HTTP, cache e performance."""
+"""Engine robustness: fuzzing, edge cases, HTTP client, cache and performance."""
 from __future__ import annotations
 
 import json
@@ -28,7 +28,7 @@ E_POOL = [
     "en:e407a",
     "en:e621",
     "en:e951",
-    "en:e9999",  # sconosciuto: deve essere ignorato, non far crashare
+    "en:e9999",  # unknown: must be ignored, not crash
 ]
 NUTRIENTS = {
     "energy-kcal_100g": 900,
@@ -83,7 +83,7 @@ def random_raw(rng: random.Random) -> dict:
 class FuzzTests(unittest.TestCase):
     def test_random_products_never_crash_and_stay_in_range(self) -> None:
         rng = random.Random(2024)
-        engine = ScoreEngine(make_table([("E250", "preservative", "Nitrito di sodio", "60")]))
+        engine = ScoreEngine(make_table([("E250", "preservative", "Sodium nitrite", "60")]))
         for _ in range(600):
             record = normalize_product(random_raw(rng))
             result = engine.score(record)
@@ -94,7 +94,7 @@ class FuzzTests(unittest.TestCase):
             self.assertGreaterEqual(result.additive_coverage, 0.0)
             self.assertLessEqual(result.additive_coverage, 1.0)
             payload = result.to_dict()
-            json.dumps(payload)  # deve essere serializzabile sempre
+            json.dumps(payload)  # must always be serializable
             text = render_report(result)
             self.assertIn("Score", text)
 
@@ -104,7 +104,7 @@ class FuzzTests(unittest.TestCase):
         self.assertGreaterEqual(result.score, 0)
         self.assertLessEqual(result.score, 100)
         self.assertLess(result.confidence, 1.0)
-        self.assertTrue(any("Nutrienti non valutati" in reason for reason in result.reasons))
+        self.assertTrue(any("Nutrients not scored" in reason for reason in result.reasons))
 
     def test_extreme_values_are_clamped(self) -> None:
         engine = ScoreEngine(make_table([]))
@@ -262,7 +262,7 @@ class PerformanceTests(unittest.TestCase):
     def test_scoring_is_fast(self) -> None:
         rng = random.Random(7)
         engine = ScoreEngine(
-            make_table([("E250", "preservative", "Nitrito di sodio", "60"), ("E330", "acidity regulator", "Citrico", "3")])
+            make_table([("E250", "preservative", "Sodium nitrite", "60"), ("E330", "acidity regulator", "Citric acid", "3")])
         )
         records = [normalize_product(random_raw(rng)) for _ in range(500)]
         start = time.perf_counter()

@@ -1,11 +1,11 @@
 """
-Self-test end-to-end: API Open Food Facts + invarianti del motore + prodotti reali.
+End-to-end self-test: Open Food Facts API + engine invariants + real products.
 
-Uso:
-    python tools/selftest.py            # usa la cache
-    python tools/selftest.py --no-cache # forza la rete
+Usage:
+    python tools/selftest.py            # uses the cache
+    python tools/selftest.py --no-cache # forces the network
 
-Non e' un test unitario: e' un collaudo diagnostico che stampa cosa non torna.
+This is not a unit test: it is a diagnostic check that prints what does not add up.
 """
 from __future__ import annotations
 
@@ -28,22 +28,22 @@ from engine import (  # noqa: E402
 )
 from engine.off_client import DEFAULT_FIELDS, DEFAULT_USER_AGENT  # noqa: E402
 
-# Prodotti scelti per coprire categorie diverse (bibite, salumi, dolci, latte, snack).
+# Products chosen to cover different categories (soft drinks, cold cuts, sweets, dairy, snacks).
 CURATED = [
-    ("5449000000996", "bibita"),
-    ("5449000011527", "bibita"),
+    ("5449000000996", "soft drink"),
+    ("5449000011527", "soft drink"),
     ("9002490100070", "energy drink"),
-    ("3017620422003", "crema spalmabile"),
-    ("7622210449283", "biscotti"),
-    ("5000159484695", "snack cioccolato"),
-    ("4008400402222", "cioccolato"),
-    ("3095758049019", "salume cotto"),
-    ("8480000057105", "salume tacchino"),
-    ("6111246721261", "latticino"),
-    ("3033490003175", "yogurt"),
-    ("3229820129488", "cereali/bio"),
-    ("3560070464290", "prodotto Carrefour"),
-    ("3168930010265", "prodotto sconosciuto"),
+    ("3017620422003", "spread"),
+    ("7622210449283", "biscuits"),
+    ("5000159484695", "chocolate snack"),
+    ("4008400402222", "chocolate"),
+    ("3095758049019", "cooked cold cut"),
+    ("8480000057105", "turkey cold cut"),
+    ("6111246721261", "dairy product"),
+    ("3033490003175", "yoghurt"),
+    ("3229820129488", "cereals/organic"),
+    ("3560070464290", "Carrefour product"),
+    ("3168930010265", "unknown product"),
 ]
 
 ANOMALIES: list[tuple[str, str]] = []
@@ -73,8 +73,8 @@ def check_api(client: OFFClient) -> dict:
 
     product = payload.get("product") or {}
     report["keys_returned"] = len(product)
-    # `ingredients` ora lo chiediamo apposta (serve per le dosi): la verifica
-    # controlla che non arrivino payload pesanti non richiesti.
+    # `ingredients` is requested on purpose now (needed for the doses): the check
+    # verifies that heavy, unrequested payloads do not arrive.
     report["fields_honoured"] = "images" not in product and "ingredients_original" not in product
     report["has_status"] = payload.get("status")
     report["code_matches"] = str(product.get("code")) == "5449000000996"
@@ -82,22 +82,22 @@ def check_api(client: OFFClient) -> dict:
     required = {"code", "nutriments", "additives_tags", "categories_tags", "labels_tags"}
     missing = required - set(product)
     if missing:
-        flag("API", f"campi attesi assenti nella risposta: {sorted(missing)}")
+        flag("API", f"expected fields missing from the response: {sorted(missing)}")
     report["required_fields_ok"] = not missing
 
     # barcode inesistente -> OFFError pulito
     started = time.perf_counter()
     try:
         client.fetch("0000000000000", use_cache=False)
-        flag("API", "barcode inesistente non ha sollevato OFFError")
+        flag("API", "unknown barcode did not raise OFFError")
         report["not_found_handled"] = False
     except OFFError as error:
         report["not_found_handled"] = True
         report["not_found_message"] = str(error)[:80]
     report["not_found_ms"] = round((time.perf_counter() - started) * 1000)
 
-    # cache: client dedicato con cache temporanea pulita (il client condiviso
-    # qui sopra puo' avere cache disattivata da --no-cache).
+    # cache: dedicated client with a clean temporary cache (the shared client
+    # above may have the cache disabled by --no-cache).
     cache_path = Path("cache/selftest-cache.sqlite")
     cache_path.unlink(missing_ok=True)
     cache_client = OFFClient(cache_path=cache_path)
@@ -133,27 +133,27 @@ def check_api(client: OFFClient) -> dict:
 def check_result(code: str, result, record) -> list[str]:
     problems: list[str] = []
     if not (0 <= result.score <= 100):
-        problems.append(f"score fuori range: {result.score}")
+        problems.append(f"score out of range: {result.score}")
     from engine.models import grade_for
 
     if result.grade != grade_for(result.score):
-        problems.append("grade incoerente con lo score")
+        problems.append("grade inconsistent with the score")
     if not (0.0 < result.confidence <= 1.0001):
-        problems.append(f"confidence fuori range: {result.confidence}")
+        problems.append(f"confidence out of range: {result.confidence}")
     if abs(sum(c.weight for c in result.components) - 1.0) > 1e-6:
-        problems.append("pesi delle componenti non sommano 1")
+        problems.append("component weights do not add up to 1")
     for component in result.components:
         if component.score is not None and not (0 <= component.score <= 100):
-            problems.append(f"componente {component.name} fuori range: {component.score}")
+            problems.append(f"component {component.name} out of range: {component.score}")
     if result.additives:
         worst = max(hit.risk for hit in result.additives)
         if abs((result.worst_additive.risk if result.worst_additive else 0) - worst) > 1e-6:
-            problems.append("worst_additive non corrisponde al rischio massimo")
+            problems.append("worst_additive does not match the maximum risk")
         for hit in result.additives:
             if not (0 <= hit.risk <= 100):
-                problems.append(f"{hit.e_number} rischio fuori range: {hit.risk}")
+                problems.append(f"{hit.e_number} risk out of range: {hit.risk}")
     if not (0.0 <= result.additive_coverage <= 1.0):
-        problems.append(f"additive_coverage fuori range: {result.additive_coverage}")
+        problems.append(f"additive_coverage out of range: {result.additive_coverage}")
     nutrition = next(c for c in result.components if c.name == "nutrition")
     if nutrition.score is not None:
         facts = record.nutriments
@@ -165,13 +165,13 @@ def check_result(code: str, result, record) -> list[str]:
             minimum = 3
         if present < minimum:
             problems.append(
-                f"nutrienti valutati con {present} valori chiave su 4 (dati mancanti trattati come 0)"
+                f"nutrients scored with {present} of 4 key values (missing data treated as 0)"
             )
     return problems
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Self-test del motore")
+    parser = argparse.ArgumentParser(description="Engine self-test")
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--table", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -189,9 +189,9 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print("=" * 78)
-    print("B) PRODOTTI REALI")
+    print("B) REAL PRODUCTS")
     print("=" * 78)
-    print(f"{'barcode':<14}{'score':>6} {'conf':>5} {'nut':>5} {'add':>5} {'n':>3}  nome / note")
+    print(f"{'barcode':<14}{'score':>6} {'conf':>5} {'nut':>5} {'add':>5} {'n':>3}  name / notes")
     print("-" * 78)
 
     details: list[dict] = []
@@ -200,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
             raw = client.fetch_raw(code)
             record = normalize_product(raw)
         except OFFError as error:
-            print(f"{code:<14}{'--':>6}  non disponibile: {str(error)[:44]}")
+            print(f"{code:<14}{'--':>6}  unavailable: {str(error)[:44]}")
             continue
 
         result = engine.score(record)
@@ -211,20 +211,20 @@ def main(argv: list[str] | None = None) -> int:
         additives = next(c for c in result.components if c.name == "additives")
         note_bits = [label]
         if record.is_beverage:
-            note_bits.append("bevanda")
+            note_bits.append("beverage")
         if unknown_tags:
-            note_bits.append(f"tag OFF sconosciuti: {unknown_tags}")
+            note_bits.append(f"unknown OFF tags: {unknown_tags}")
         if nutrition.details.get("salt_from_sodium"):
-            note_bits.append("sale da sodio")
+            note_bits.append("salt from sodium")
         if record.additives and additives.details.get("estimated"):
-            note_bits.append(f"{additives.details['estimated']} additivi stimati")
+            note_bits.append(f"{additives.details['estimated']} estimated additives")
         if result.additive_coverage < 1.0:
-            note_bits.append(f"copertura rischi {result.additive_coverage * 100:.0f}%")
+            note_bits.append(f"risk coverage {result.additive_coverage * 100:.0f}%")
         problems = check_result(code, result, record)
         for problem in problems:
-            flag("MOTORE", f"{code}: {problem}")
+            flag("ENGINE", f"{code}: {problem}")
         if unknown_tags:
-            flag("TABELLA", f"{code}: additivi OFF non risolti {unknown_tags}")
+            flag("TABLE", f"{code}: unresolved OFF additives {unknown_tags}")
 
         print(
             f"{code:<14}{result.score:>6} {result.confidence * 100:>4.0f}% "
@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print("=" * 78)
-    print("C) COERENZA CON NUTRI-SCORE DI OPEN FOOD FACTS")
+    print("C) AGREEMENT WITH THE OPEN FOOD FACTS NUTRI-SCORE")
     print("=" * 78)
     grade_to_ns = {"a": 95, "b": 78, "c": 60, "d": 38, "e": 15}
     for item in details:
@@ -260,17 +260,17 @@ def main(argv: list[str] | None = None) -> int:
             delta = item["nutrition"] - grade_to_ns[off_grade]
             if abs(delta) > 25:
                 flag(
-                    "CALIBRAZIONE",
-                    f"{item['code']}: nutrienti {item['nutrition']:.0f} vs OFF "
+                    "CALIBRATION",
+                    f"{item['code']}: nutrition {item['nutrition']:.0f} vs OFF "
                     f"Nutri-Score {off_grade.upper()} (~{grade_to_ns[off_grade]})",
                 )
 
     print()
     print("=" * 78)
-    print("D) ANOMALIE")
+    print("D) ANOMALIES")
     print("=" * 78)
     if not ANOMALIES:
-        print("  nessuna anomalia rilevata")
+        print("  no anomaly detected")
     for severity, message in ANOMALIES:
         print(f"  [{severity}] {message}")
 
@@ -278,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
     scores = [item["score"] for item in details]
     if scores:
         print(
-            f"Prodotti valutati: {len(scores)} · media {statistics.mean(scores):.0f} · "
+            f"Products scored: {len(scores)} · mean {statistics.mean(scores):.0f} · "
             f"min {min(scores)} · max {max(scores)}"
         )
     api_failures = sum(

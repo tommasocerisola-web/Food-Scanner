@@ -1,5 +1,5 @@
 """
-Unione delle tre fonti da riga di comando.
+Merge the three sources from the command line.
 
     python tools/merge_sources.py fetch --barcodes barcodes.txt --out out/sources
     python tools/merge_sources.py merge \\
@@ -8,11 +8,12 @@ Unione delle tre fonti da riga di comando.
         --source openprices=out/sources/openprices.json \\
         --out out/merged.json --csv out/merged.csv
     python tools/merge_sources.py table \\
-        --table off=data/additives.csv --table yuka=yuka_additivi.csv \\
+        --table off=data/additives.csv --table yuka=yuka_additives.csv \\
         --out out/additives.merge.csv --gaps out/additives.gaps.json
 
-`fetch` scarica le tre fonti per una lista di barcode; `merge` unisce i dati con
-l'algoritmo di `engine/merge.py`; `table` fa il consenso sulle tabelle di rischio.
+`fetch` downloads the three sources for a list of barcodes; `merge` combines the
+data with the algorithm in `engine/merge.py`; `table` builds the consensus on the
+risk tables.
 """
 from __future__ import annotations
 
@@ -35,24 +36,24 @@ DEFAULT_TABLE = ROOT / "data" / "additives.csv"
 
 CSV_FIELDS = (
     "barcode",
-    "nome",
-    "marca",
-    "quantita",
+    "name",
+    "brand",
+    "quantity",
     "kcal",
     "sugars",
     "salt",
     "saturated_fat",
     "fiber",
     "protein",
-    "additivi",
-    "punteggio_additivi",
+    "additives",
+    "additive_score",
     "grade",
     "nova",
-    "prezzo",
-    "prezzo_base",
-    "confidenza",
-    "fonti",
-    "flag",
+    "price",
+    "price_basis",
+    "confidence",
+    "sources",
+    "flags",
 )
 
 
@@ -76,7 +77,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     if args.limit and args.limit > 0:
         barcodes = barcodes[: args.limit]
     if not barcodes:
-        print("nessun barcode nel file", file=sys.stderr)
+        print("no barcode in the file", file=sys.stderr)
         return 2
 
     sources = [name.strip() for name in args.sources.split(",") if name.strip()]
@@ -87,7 +88,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     disabled: set[str] = set()
 
     def flush() -> None:
-        # Scrittura incrementale: un timeout non deve perdere i prodotti gia' presi.
+        # Incremental writing: a timeout must not lose the products already fetched.
         for source, products in collected.items():
             (out / f"{source}.json").write_text(
                 json.dumps(products, ensure_ascii=False, indent=1), encoding="utf-8"
@@ -102,7 +103,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
             try:
                 seed = fetch_source("off", barcode)
             except FetchError as error:
-                errors.append({"barcode": barcode, "fonte": "off", "errore": str(error)})
+                errors.append({"barcode": barcode, "source": "off", "error": str(error)})
                 if _quota_error(error):
                     disabled.add("off")
             if seed is not None:
@@ -119,7 +120,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
                     brand=seed.brand if seed else "",
                 )
             except FetchError as error:
-                errors.append({"barcode": barcode, "fonte": source, "errore": str(error)})
+                errors.append({"barcode": barcode, "source": source, "error": str(error)})
                 if _quota_error(error):
                     disabled.add(source)
                 continue
@@ -134,14 +135,14 @@ def cmd_fetch(args: argparse.Namespace) -> int:
         print(f"[{index}/{len(barcodes)}] {barcode}: {found}")
 
     flush()
-    print(f"scritto {out} · errori: {len(errors)}")
+    print(f"wrote {out} · errors: {len(errors)}")
     return 0
 
 
 def _quota_error(error: Exception) -> bool:
-    """Limite orario/key: inutile continuare a chiedere la stessa fonte."""
+    """Hourly/key limit: there is no point asking the same source again."""
     text = str(error).lower()
-    return "demo_key" in text or "limite" in text or "429" in text
+    return "demo_key" in text or "limit" in text or "limite" in text or "429" in text
 
 
 # --------------------------------------------------------------------------- #
@@ -149,14 +150,14 @@ def _quota_error(error: Exception) -> bool:
 # --------------------------------------------------------------------------- #
 def _split_spec(spec: str) -> tuple[str, Path]:
     if "=" not in spec:
-        raise ValueError(f"specifica senza '=': {spec} (usa nome=file)")
+        raise ValueError(f"spec without '=': {spec} (use name=file)")
     name, raw = spec.split("=", 1)
     name = name.strip()
     if not name:
-        raise ValueError(f"nome fonte vuoto: {spec}")
+        raise ValueError(f"empty source name: {spec}")
     path = Path(raw.strip())
     if not path.is_file():
-        raise FileNotFoundError(f"file non trovato: {path}")
+        raise FileNotFoundError(f"file not found: {path}")
     return name, path
 
 
@@ -175,32 +176,32 @@ def cmd_merge(args: argparse.Namespace) -> int:
     payload = {
         "generator": "generic_01 merge_sources",
         "sources": {
-            name: {"file": files[name], "prodotti": len(entries)}
+            name: {"file": files[name], "products": len(entries)}
             for name, entries in products.items()
         },
-        "totale_prodotti": sum(len(entries) for entries in products.values()),
-        "cluster": len(clusters),
-        "prodotti": merged,
-        "ambigui": ambiguous,
-        "non_uniti": [
+        "total_products": sum(len(entries) for entries in products.values()),
+        "clusters": len(clusters),
+        "products": merged,
+        "ambiguous": ambiguous,
+        "unmatched": [
             {
                 "barcode": cluster.barcode,
-                "nome": cluster.name,
-                "fonte": next(iter(cluster.entries)),
+                "name": cluster.name,
+                "source": next(iter(cluster.entries)),
             }
             for cluster in clusters.values()
             if len(cluster.entries) == 1
         ],
-        "sintesi": {
-            "in_comune": sum(1 for cluster in clusters.values() if len(cluster.entries) > 1),
-            "conflitti": sum(
+        "summary": {
+            "shared": sum(1 for cluster in clusters.values() if len(cluster.entries) > 1),
+            "conflicts": sum(
                 1
                 for item in merged
-                if item["conflitti"] or "punteggi_discordanti" in item["flag"]
+                if item["conflicts"] or "scores_conflict" in item["flags"]
             ),
-            "senza_prezzo": sum(1 for item in merged if item["prezzo"] is None),
-            "confidenza_media": (
-                round(sum(item["confidenza"] for item in merged) / len(merged), 3) if merged else 0.0
+            "without_price": sum(1 for item in merged if item["price"] is None),
+            "mean_confidence": (
+                round(sum(item["confidence"] for item in merged) / len(merged), 3) if merged else 0.0
             ),
         },
     }
@@ -216,34 +217,34 @@ def cmd_merge(args: argparse.Namespace) -> int:
             writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
             writer.writeheader()
             for item in merged:
-                nutrients = item["nutrienti"]
+                nutrients = item["nutrients"]
                 writer.writerow(
                     {
                         "barcode": item["barcode"],
-                        "nome": item["nome"],
-                        "marca": item["marca"],
-                        "quantita": item["quantita"],
+                        "name": item["name"],
+                        "brand": item["brand"],
+                        "quantity": item["quantity"],
                         "kcal": nutrients.get("kcal", ""),
                         "sugars": nutrients.get("sugars", ""),
                         "salt": nutrients.get("salt", ""),
                         "saturated_fat": nutrients.get("saturated_fat", ""),
                         "fiber": nutrients.get("fiber", ""),
                         "protein": nutrients.get("protein", ""),
-                        "additivi": "|".join(row["tag"] for row in item["additivi"]),
-                        "punteggio_additivi": item["punteggio_additivi"] if item["punteggio_additivi"] is not None else "",
+                        "additives": "|".join(row["tag"] for row in item["additives"]),
+                        "additive_score": item["additive_score"] if item["additive_score"] is not None else "",
                         "grade": item["grade"] or "",
                         "nova": item["nova"] if item["nova"] is not None else "",
-                        "prezzo": item["prezzo"] if item["prezzo"] is not None else "",
-                        "prezzo_base": item["prezzo_base"],
-                        "confidenza": item["confidenza"],
-                        "fonti": "|".join(item["fonti"]),
-                        "flag": "|".join(item["flag"]),
+                        "price": item["price"] if item["price"] is not None else "",
+                        "price_basis": item["price_basis"],
+                        "confidence": item["confidence"],
+                        "sources": "|".join(item["sources"]),
+                        "flags": "|".join(item["flags"]),
                     }
                 )
 
     print(
-        f"{len(merged)} prodotti · {payload['sintesi']['in_comune']} in comune · "
-        f"{payload['sintesi']['conflitti']} con conflitti -> {out}"
+        f"{len(merged)} products · {payload['summary']['shared']} shared · "
+        f"{payload['summary']['conflicts']} with conflicts -> {out}"
     )
     return 0
 
@@ -268,7 +269,7 @@ def cmd_table(args: argparse.Namespace) -> int:
                 "e_number",
                 "risk_consensus",
                 "n_sources",
-                "fonti",
+                "sources",
                 "missing_in",
                 "spread",
                 "agreement",
@@ -282,7 +283,7 @@ def cmd_table(args: argparse.Namespace) -> int:
             writer.writerow(
                 {
                     **row,
-                    "fonti": "|".join(row["fonti"]),
+                    "sources": "|".join(row["sources"]),
                     "missing_in": "|".join(row["missing_in"]),
                     "reasons": "; ".join(row["reasons"]),
                 }
@@ -301,8 +302,8 @@ def cmd_table(args: argparse.Namespace) -> int:
     )
 
     print(
-        f"{len(merged)} additivi · {len(merged) - len(gaps)} concordi · "
-        f"{len(gaps)} da rivedere -> {out}"
+        f"{len(merged)} additives · {len(merged) - len(gaps)} agreeing · "
+        f"{len(gaps)} to review -> {out}"
     )
     return 0
 
@@ -313,26 +314,26 @@ def cmd_table(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="merge_sources",
-        description="Unisce Open Food Facts, USDA FDC e Open Prices in un solo record.",
+        description="Merge Open Food Facts, USDA FDC and Open Prices into a single record.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    fetch = sub.add_parser("fetch", help="scarica le fonti per una lista di barcode")
-    fetch.add_argument("--barcodes", required=True, help="file con un barcode per riga")
-    fetch.add_argument("--out", default="out/sources", help="cartella di output")
-    fetch.add_argument("--sources", default="off,fdc,openprices", help="fonti separate da virgola")
-    fetch.add_argument("--limit", type=int, default=0, help="max barcode (0 = tutti)")
+    fetch = sub.add_parser("fetch", help="download the sources for a list of barcodes")
+    fetch.add_argument("--barcodes", required=True, help="file with one barcode per line")
+    fetch.add_argument("--out", default="out/sources", help="output folder")
+    fetch.add_argument("--sources", default="off,fdc,openprices", help="comma-separated sources")
+    fetch.add_argument("--limit", type=int, default=0, help="max barcodes (0 = all)")
     fetch.set_defaults(func=cmd_fetch)
 
-    merge = sub.add_parser("merge", help="unisce gli export delle fonti")
-    merge.add_argument("--source", action="append", required=True, help="nome=file.json")
+    merge = sub.add_parser("merge", help="merge the source exports")
+    merge.add_argument("--source", action="append", required=True, help="name=file.json")
     merge.add_argument("--out", default="out/merged.json")
     merge.add_argument("--csv", default="out/merged.csv")
-    merge.add_argument("--additives", default=str(DEFAULT_TABLE), help="tabella additivi")
+    merge.add_argument("--additives", default=str(DEFAULT_TABLE), help="additive table")
     merge.set_defaults(func=cmd_merge)
 
-    table = sub.add_parser("table", help="consenso tra tabelle di rischio additivi")
-    table.add_argument("--table", action="append", required=True, help="nome=file.csv")
+    table = sub.add_parser("table", help="consensus across additive risk tables")
+    table.add_argument("--table", action="append", required=True, help="name=file.csv")
     table.add_argument("--out", default="out/additives.merge.csv")
     table.add_argument("--gaps", default="out/additives.gaps.json")
     table.set_defaults(func=cmd_table)
@@ -345,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except (OSError, ValueError) as error:
-        print(f"errore: {error}", file=sys.stderr)
+        print(f"error: {error}", file=sys.stderr)
         return 2
 
 

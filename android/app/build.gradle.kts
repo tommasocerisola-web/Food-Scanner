@@ -34,10 +34,10 @@ android {
         applicationId = "com.foodscanner.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
+        versionCode = 4
         versionName = "0.3-beta"
 
-        // L'APK è pensato per telefoni Android 17 arm64.
+        // The APK targets Android 17 arm64 phones.
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -53,7 +53,7 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
-            // Per un APK installabile senza un keystore personale.
+            // So the APK is installable without a personal keystore.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

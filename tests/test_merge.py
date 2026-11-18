@@ -1,4 +1,4 @@
-"""Test del merger multi-fonte: GTIN, mediana pesata, conflitti, consenso, CLI."""
+"""Multi-source merger tests: GTIN, weighted median, conflicts, consensus, CLI."""
 from __future__ import annotations
 
 import contextlib
@@ -70,10 +70,10 @@ class NutrientMergeTests(unittest.TestCase):
         )
         self.assertEqual(merged["values"]["sugars"], 10)
         self.assertEqual(len(merged["conflicts"]), 1)
-        self.assertEqual(merged["conflicts"][0]["campo"], "sugars")
+        self.assertEqual(merged["conflicts"][0]["field"], "sugars")
         self.assertEqual(merged["agreement"], 0.0)
 
-    def test_campo_mancante_usa_l_altra_fonte(self) -> None:
+    def test_missing_field_uses_the_other_source(self) -> None:
         merged = merge_nutrients(
             {
                 "off": product("off", nutrients={"kcal": 539}),
@@ -85,7 +85,7 @@ class NutrientMergeTests(unittest.TestCase):
         self.assertNotIn("salt", merged["conflicts"])
 
     def test_pesi_per_campo(self) -> None:
-        # FDC pesa 1.1 sui nutrienti: con lo stesso valore il pareggio va a FDC.
+        # FDC weighs 1.1 on nutrients: with the same value the tie goes to FDC.
         profiles = {
             "off": {"weight": 1.0, "fields": {"nutrients": 1.0}},
             "fdc": {"weight": 1.0, "fields": {"nutrients": 1.1}},
@@ -101,7 +101,7 @@ class NutrientMergeTests(unittest.TestCase):
 
 
 class AdditiveMergeTests(unittest.TestCase):
-    def test_unione_sconosciuti_e_punteggio(self) -> None:
+    def test_merge_unknown_additives_and_score(self) -> None:
         table = make_table([("E322", "emulsifier", "Lecitine", "20")])
         merged = merge_additives(
             {
@@ -110,14 +110,14 @@ class AdditiveMergeTests(unittest.TestCase):
             },
             table,
         )
-        self.assertEqual(merged["punteggio"], 80.0)
-        self.assertEqual([row["tag"] for row in merged["sconosciuti"]], ["e999"])
-        self.assertEqual(merged["additivi"][0]["fonti"], ["fdc", "off"])
+        self.assertEqual(merged["score"], 80.0)
+        self.assertEqual([row["tag"] for row in merged["unknown"]], ["e999"])
+        self.assertEqual(merged["additives"][0]["sources"], ["fdc", "off"])
 
     def test_senza_additivi(self) -> None:
         merged = merge_additives({"off": product("off")}, None)
-        self.assertIsNone(merged["punteggio"])
-        self.assertFalse(merged["dichiarati"])
+        self.assertIsNone(merged["score"])
+        self.assertFalse(merged["declared"])
 
 
 class GroupMergeTests(unittest.TestCase):
@@ -153,12 +153,12 @@ class GroupMergeTests(unittest.TestCase):
             },
             table,
         )
-        self.assertGreater(triple["confidenza"], single["confidenza"])
-        self.assertIn("una_sola_fonte", single["flag"])
-        self.assertNotIn("una_sola_fonte", triple["flag"])
-        self.assertEqual(triple["prezzo"], 0.8)
-        self.assertEqual(triple["prezzo_base"], "100g")
-        self.assertEqual(triple["prezzo_osservazioni"], 5)
+        self.assertGreater(triple["confidence"], single["confidence"])
+        self.assertIn("single_source", single["flags"])
+        self.assertNotIn("single_source", triple["flags"])
+        self.assertEqual(triple["price"], 0.8)
+        self.assertEqual(triple["price_basis"], "100g")
+        self.assertEqual(triple["price_observations"], 5)
 
     def test_grade_in_conflitto(self) -> None:
         profiles = {
@@ -173,7 +173,7 @@ class GroupMergeTests(unittest.TestCase):
             None,
             profiles,
         )
-        self.assertIn("grade_discordante", merged["flag"])
+        self.assertIn("grade_conflict", merged["flags"])
         self.assertEqual(merged["grade"], "E")
 
     def test_merge_products_ordina(self) -> None:
@@ -183,7 +183,7 @@ class GroupMergeTests(unittest.TestCase):
                 {"off": product("off", barcode="2222222222222", name="Alfa")},
             ]
         )
-        self.assertEqual([item["nome"] for item in merged], ["Alfa", "Zeta"])
+        self.assertEqual([item["name"] for item in merged], ["Alfa", "Zeta"])
 
 
 class RiskTableTests(unittest.TestCase):
@@ -207,7 +207,7 @@ class RiskTableTests(unittest.TestCase):
     def test_fonti_discordi(self) -> None:
         rows = {row["e_number"]: row for row in merge_risk_tables({"off": {"e102": 10}, "yuka": {"e102": 90}})}
         self.assertTrue(rows["e102"]["needs_review"])
-        self.assertIn("fonti discordi", " ".join(rows["e102"]["reasons"]))
+        self.assertIn("sources disagree", " ".join(rows["e102"]["reasons"]))
 
 
 class SourceParsingTests(unittest.TestCase):
@@ -378,12 +378,12 @@ class CliTests(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         payload = json.loads(out.read_text(encoding="utf-8"))
-        self.assertEqual(payload["sintesi"]["in_comune"], 1)
-        item = payload["prodotti"][0]
-        self.assertEqual(item["nutrienti"]["kcal"], 539)
-        self.assertEqual(item["fonti"], ["fdc", "off"])
+        self.assertEqual(payload["summary"]["shared"], 1)
+        item = payload["products"][0]
+        self.assertEqual(item["nutrients"]["kcal"], 539)
+        self.assertEqual(item["sources"], ["fdc", "off"])
         self.assertTrue(csv_out.exists())
-        self.assertIn("barcode,nome", csv_out.read_text(encoding="utf-8").splitlines()[0])
+        self.assertIn("barcode,name", csv_out.read_text(encoding="utf-8").splitlines()[0])
 
     def test_table_end_to_end(self) -> None:
         off_path = self.dir / "t_off.csv"

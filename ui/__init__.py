@@ -1,1 +1,1 @@
-"""UI di test per generic_01 (solo standard library)."""
+"""Test UI for generic_01 (standard library only)."""

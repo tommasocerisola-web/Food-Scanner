@@ -1,15 +1,15 @@
-"""Modelli dati del motore: prodotto normalizzato, additivo, componenti di score."""
+"""Engine data models: normalized product, additive hit, score components."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-# Soglie di valutazione finale (stile Yuka: 4 fasce).
+# Final grading thresholds (Yuka-style: four bands).
 GRADE_THRESHOLDS: tuple[tuple[int, str], ...] = (
-    (75, "eccellente"),
-    (50, "buono"),
-    (25, "scarso"),
-    (0, "pessimo"),
+    (75, "excellent"),
+    (50, "good"),
+    (25, "poor"),
+    (0, "bad"),
 )
 
 
@@ -17,12 +17,12 @@ def grade_for(score: float) -> str:
     for threshold, label in GRADE_THRESHOLDS:
         if score >= threshold:
             return label
-    return "pessimo"
+    return "bad"
 
 
 @dataclass(frozen=True)
 class NutrientFacts:
-    """Valori per 100 g/ml. None = dato assente in Open Food Facts."""
+    """Values per 100 g/ml. None = data missing in Open Food Facts."""
 
     kcal: float | None = None
     sugars: float | None = None
@@ -52,7 +52,7 @@ class NutrientFacts:
 
 @dataclass(frozen=True)
 class ProductRecord:
-    """Prodotto Open Food Facts normalizzato e pronto per lo scoring."""
+    """Open Food Facts product, normalized and ready for scoring."""
 
     barcode: str
     name: str = ""
@@ -61,7 +61,7 @@ class ProductRecord:
     categories: tuple[str, ...] = ()
     labels: tuple[str, ...] = ()
     ingredients_text: str | None = None
-    additives: tuple[str, ...] = ()  # chiavi OFF, es. ('en:e322',)
+    additives: tuple[str, ...] = ()  # OFF keys, e.g. ('en:e322',)
     nutriments: NutrientFacts = field(default_factory=NutrientFacts)
     nova_group: int | None = None
     nutriscore_grade: str | None = None
@@ -101,7 +101,7 @@ class ProductRecord:
 
 @dataclass(frozen=True)
 class AdditiveHit:
-    """Additivo trovato nel prodotto, con il rischio applicato."""
+    """Additive found in the product, with the applied risk."""
 
     key: str
     e_number: str
@@ -129,7 +129,7 @@ class AdditiveHit:
 
 @dataclass(frozen=True)
 class ComponentScore:
-    """Punteggio 0-100 di una singola componente (o None se dato assente)."""
+    """0-100 score of a single component (or None when the data is missing)."""
 
     name: str
     score: float | None
@@ -147,7 +147,7 @@ class ComponentScore:
 
 @dataclass(frozen=True)
 class Alert:
-    level: str  # 'critico' | 'attenzione' | 'info'
+    level: str  # 'critical' | 'warning' | 'info'
     code: str
     message: str
 
@@ -157,7 +157,7 @@ class Alert:
 
 @dataclass(frozen=True)
 class ScoreResult:
-    """Risultato completo: pronto per essere serializzato verso la futura UI."""
+    """Complete result: ready to be serialized towards the UI."""
 
     score: int
     grade: str

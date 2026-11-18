@@ -1,20 +1,20 @@
 """
-Unione multi-fonte: mediana pesata, provenienza, conflitti e confidenza.
+Multi-source merge: weighted median, provenance, conflicts and confidence.
 
-Le tre fonti previste (tutte senza chiave API obbligatoria) hanno punti di forza
-diversi, quindi il merger non sceglie una fonte "vincente": per **ogni campo**
-prende la mediana pesata delle fonti che lo riportano, registra quale fonte ha
-fornito il valore e segnala i conflitti oltre tolleranza. Un campo assente in una
-fonte non la penalizza: il peso viene semplicemente rinormalizzato.
+The three supported sources (none of them requiring a mandatory API key) have
+different strengths, so the merger does not pick a "winning" source: for
+**every field** it takes the weighted median of the sources reporting it, records
+which source provided the value and flags conflicts beyond tolerance. A field
+missing in one source does not penalise it: the weight is simply renormalized.
 
-Pesi:
-  * Open Food Facts 1.0 — additivi, Nutri-Score, NOVA, etichette;
-  * USDA FDC       0.9 — nutrienti (peso 1.1 sul campo), ingredienti, GTIN;
-  * Open Prices    0.7 — prezzo, confezione, negozio.
+Weights:
+  * Open Food Facts 1.0 — additives, Nutri-Score, NOVA, labels;
+  * USDA FDC       0.9 — nutrients (weight 1.1 on the field), ingredients, GTIN;
+  * Open Prices    0.7 — price, package, store.
 
-La confidenza finale combina copertura dei campi, accordo tra fonti e numero di
-fonti presenti: un prodotto visto da una sola fonte non puo' avere confidenza
-alta, anche se tutti i campi sono pieni.
+The final confidence combines field coverage, agreement between sources and the
+number of sources present: a product seen by a single source cannot have high
+confidence, even when every field is filled.
 """
 from __future__ import annotations
 
@@ -84,9 +84,9 @@ SOURCE_PROFILES: dict[str, dict[str, Any]] = {
         },
     },
 }
-DEFAULT_PROFILE: dict[str, Any] = {"label": "fonte", "weight": 0.5, "fields": {}}
+DEFAULT_PROFILE: dict[str, Any] = {"label": "source", "weight": 0.5, "fields": {}}
 
-# (tolleranza relativa, soglia minima assoluta) oltre cui due fonti si contraddicono.
+# (relative tolerance, absolute minimum threshold) above which two sources contradict.
 NUTRIENT_TOLERANCE: dict[str, tuple[float, float]] = {
     "kcal": (0.15, 15.0),
     "sugars": (0.20, 0.7),
@@ -100,22 +100,22 @@ NUTRIENT_TOLERANCE: dict[str, tuple[float, float]] = {
     "fruits_veg_nuts": (0.35, 5.0),
 }
 
-SCORE_SPREAD = 15.0          # punti: oltre, i punteggi delle fonti divergono
-ADDITIVE_WORST_WEIGHT = 0.65  # stesso peso del motore: il peggiore domina
+SCORE_SPREAD = 15.0          # points: beyond this, source scores diverge
+ADDITIVE_WORST_WEIGHT = 0.65  # same weight as the engine: the worst dominates
 ADDITIVE_MEAN_WEIGHT = 0.35
 ADDITIVE_EXTRA_PER_ITEM = 2.5
 ADDITIVE_EXTRA_CAP = 10.0
-RISK_SPREAD = 15.0            # punti: oltre, la tabella di consenso va rivista
+RISK_SPREAD = 15.0            # points: beyond this, the consensus table needs review
 
 
 # --------------------------------------------------------------------------- #
-# Codici e statistiche
+# Codes and statistics
 # --------------------------------------------------------------------------- #
 def gtin14(value: str) -> str:
-    """GTIN-8/UPC-12/EAN-13/GTIN-14 -> GTIN-14 con zeri iniziali.
+    """GTIN-8/UPC-12/EAN-13/GTIN-14 -> GTIN-14 with leading zeros.
 
-    Serve perche' lo stesso prodotto puo' arrivare come UPC-12 (US) o EAN-13
-    (EU): normalizzare a 14 cifre evita falsi negativi.
+    Needed because the same product can arrive as UPC-12 (US) or EAN-13 (EU):
+    normalizing to 14 digits avoids false negatives.
     """
     digits = re.sub(r"\D", "", str(value or ""))
     if len(digits) not in (8, 12, 13, 14):
@@ -124,7 +124,7 @@ def gtin14(value: str) -> str:
 
 
 def weighted_median(pairs: Sequence[tuple[float, float]]) -> float | None:
-    """Mediana pesata (basso): il primo valore che raggiunge meta' del peso."""
+    """Weighted median (low): the first value reaching half of the weight."""
     usable = sorted(
         (float(value), float(weight))
         for value, weight in pairs
@@ -160,7 +160,7 @@ def _field_weight(
 
 
 # --------------------------------------------------------------------------- #
-# Nutrienti
+# Nutrients
 # --------------------------------------------------------------------------- #
 def merge_nutrients(
     entries: Mapping[str, SourceProduct],
@@ -206,11 +206,11 @@ def merge_nutrients(
         if len({source for source, _, _ in samples}) > 1 and spread >= floor and relative > tolerance:
             conflicts.append(
                 {
-                    "campo": nutrient,
-                    "valori": {source: round(value, 2) for source, value, _ in samples},
-                    "mediana": median,
+                    "field": nutrient,
+                    "values": {source: round(value, 2) for source, value, _ in samples},
+                    "median": median,
                     "spread": round(spread, 2),
-                    "tolleranza": tolerance,
+                    "tolerance": tolerance,
                 }
             )
 
@@ -224,7 +224,7 @@ def merge_nutrients(
 
 
 # --------------------------------------------------------------------------- #
-# Additivi
+# Additives
 # --------------------------------------------------------------------------- #
 def merge_additives(
     entries: Mapping[str, SourceProduct],
@@ -240,15 +240,15 @@ def merge_additives(
     for tag, sources in sorted(presence.items()):
         row = table.get(tag) if table is not None else None
         if row is None:
-            unknown.append({"tag": tag, "fonti": sorted(sources)})
+            unknown.append({"tag": tag, "sources": sorted(sources)})
             continue
         risk, estimated = row.default_risk()
         risks.append(
             {
                 "tag": tag,
                 "risk": round(float(risk), 1),
-                "stimato": bool(estimated),
-                "fonti": sorted(sources),
+                "estimated": bool(estimated),
+                "sources": sorted(sources),
             }
         )
     risks.sort(key=lambda item: (-item["risk"], item["tag"]))
@@ -262,16 +262,16 @@ def merge_additives(
         score = round(max(0.0, min(100.0, 100.0 - penalty)), 1)
 
     return {
-        "additivi": risks,
-        "sconosciuti": unknown,
-        "punteggio": score,
-        "dichiarati": any(product.additives for product in entries.values()),
-        "stimati": sum(1 for item in risks if item["stimato"]),
+        "additives": risks,
+        "unknown": unknown,
+        "score": score,
+        "declared": any(product.additives for product in entries.values()),
+        "estimated": sum(1 for item in risks if item["estimated"]),
     }
 
 
 # --------------------------------------------------------------------------- #
-# Punteggi, scelte uniche, prezzo
+# Scores, single-choice fields, price
 # --------------------------------------------------------------------------- #
 def merge_scores(
     entries: Mapping[str, SourceProduct],
@@ -286,17 +286,17 @@ def merge_scores(
             continue
         samples.append((source, float(product.score), weight))
     if not samples:
-        return {"valore": None, "provenienza": None, "spread": None, "conflitto": False, "fonti": 0}
+        return {"value": None, "source": None, "spread": None, "conflict": False, "sources": 0}
 
     median = weighted_median([(value, weight) for _, value, weight in samples])
     spread = max(value for _, value, _ in samples) - min(value for _, value, _ in samples)
     best = min(samples, key=lambda item: (abs(item[1] - median), -item[2], item[0]))
     return {
-        "valore": median,
-        "provenienza": best[0],
+        "value": median,
+        "source": best[0],
         "spread": round(spread, 2),
-        "conflitto": len(samples) > 1 and spread > SCORE_SPREAD,
-        "fonti": len(samples),
+        "conflict": len(samples) > 1 and spread > SCORE_SPREAD,
+        "sources": len(samples),
     }
 
 
@@ -316,16 +316,16 @@ def _merge_choice(
             continue
         votes.setdefault(str(value), []).append((weight, source))
     if not votes:
-        return {"valore": None, "provenienza": None, "conflitto": False, "valori": {}}
+        return {"value": None, "source": None, "conflict": False, "values": {}}
 
     totals = {value: sum(weight for weight, _ in items) for value, items in votes.items()}
     winner = max(totals, key=lambda value: (totals[value], value))
     provenance = max(votes[winner], key=lambda item: item[0])[1]
     return {
-        "valore": winner,
-        "provenienza": provenance,
-        "conflitto": len(votes) > 1,
-        "valori": {value: [source for _, source in items] for value, items in votes.items()},
+        "value": winner,
+        "source": provenance,
+        "conflict": len(votes) > 1,
+        "values": {value: [source for _, source in items] for value, items in votes.items()},
     }
 
 
@@ -346,17 +346,17 @@ def merge_price(
 
     samples = per_100 or package
     if not samples:
-        return {"valore": None, "base": "", "osservazioni": 0, "negozi": [], "fonti": []}
+        return {"value": None, "basis": "", "observations": 0, "stores": [], "sources": []}
 
     median = weighted_median([(value, weight) for _, value, weight in samples])
     observations = sum(product.price_observations for product in entries.values())
     stores = sorted({store for product in entries.values() for store in product.stores})
     return {
-        "valore": median,
-        "base": "100g" if per_100 else "confezione",
-        "osservazioni": observations,
-        "negozi": stores[:10],
-        "fonti": sorted({source for source, _, _ in samples}),
+        "value": median,
+        "basis": "100g" if per_100 else "package",
+        "observations": observations,
+        "stores": stores[:10],
+        "sources": sorted({source for source, _, _ in samples}),
     }
 
 
@@ -389,41 +389,41 @@ def _identity(
     brand, brand_source = pick("brand")
     quantity, quantity_source = pick("quantity")
     return {
-        "nome": name,
-        "nome_fonte": name_source,
-        "marca": brand,
-        "marca_fonte": brand_source,
-        "quantita": quantity,
-        "quantita_fonte": quantity_source,
+        "name": name,
+        "name_source": name_source,
+        "brand": brand,
+        "brand_source": brand_source,
+        "quantity": quantity,
+        "quantity_source": quantity_source,
     }
 
 
 # --------------------------------------------------------------------------- #
-# Unione di un gruppo
+# Merging one group
 # --------------------------------------------------------------------------- #
 def merge_group(
     entries: Mapping[str, SourceProduct],
     table: AdditiveTable | None = None,
     profiles: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Unisce lo stesso prodotto visto da piu' fonti in un record con provenienza."""
+    """Merge the same product seen by several sources into one record with provenance."""
     if not entries:
-        raise ValueError("gruppo vuoto")
+        raise ValueError("empty group")
 
     nutrients = merge_nutrients(entries, profiles)
     additives = merge_additives(entries, table)
     scores = merge_scores(entries, profiles)
     grade = _merge_choice(entries, "grade", "grade", profiles)
     nova = _merge_choice(entries, "nova_group", "nova", profiles)
-    if isinstance(nova["valore"], str) and nova["valore"].isdigit():
-        nova["valore"] = int(nova["valore"])
+    if isinstance(nova["value"], str) and nova["value"].isdigit():
+        nova["value"] = int(nova["value"])
     identity = _identity(entries, profiles)
     price = merge_price(entries, profiles)
 
     nutrient_coverage = len(nutrients["values"]) / len(NUTRIENTS)
-    additives_coverage = 1.0 if (additives["dichiarati"] or "off" in entries) else 0.0
-    grade_coverage = 1.0 if grade["valore"] else 0.0
-    price_coverage = 1.0 if price["valore"] is not None else 0.0
+    additives_coverage = 1.0 if (additives["declared"] or "off" in entries) else 0.0
+    grade_coverage = 1.0 if grade["value"] else 0.0
+    price_coverage = 1.0 if price["value"] is not None else 0.0
     coverage = round(
         0.50 * nutrient_coverage
         + 0.20
@@ -442,50 +442,50 @@ def merge_group(
 
     flags: list[str] = []
     if nutrients["conflicts"]:
-        flags.append("nutrienti_discordanti")
-    if scores["conflitto"]:
-        flags.append("punteggi_discordanti")
-    if grade["conflitto"]:
-        flags.append("grade_discordante")
-    if nova["conflitto"]:
-        flags.append("nova_discordante")
-    if additives["sconosciuti"]:
-        flags.append("additivi_sconosciuti")
+        flags.append("nutrients_conflict")
+    if scores["conflict"]:
+        flags.append("scores_conflict")
+    if grade["conflict"]:
+        flags.append("grade_conflict")
+    if nova["conflict"]:
+        flags.append("nova_conflict")
+    if additives["unknown"]:
+        flags.append("unknown_additives")
     if source_count == 1:
-        flags.append("una_sola_fonte")
-    if price["valore"] is None:
-        flags.append("senza_prezzo")
-    if not additives["dichiarati"] and "off" not in entries:
-        flags.append("additivi_non_dichiarati")
+        flags.append("single_source")
+    if price["value"] is None:
+        flags.append("no_price")
+    if not additives["declared"] and "off" not in entries:
+        flags.append("additives_undeclared")
 
     barcode = entries[next(iter(entries))].barcode
 
     return {
         "barcode": barcode,
         "gtin": gtin14(barcode),
-        "nome": identity["nome"],
-        "marca": identity["marca"],
-        "quantita": identity["quantita"],
-        "nutrienti": nutrients["values"],
-        "provenienza_nutrienti": nutrients["provenance"],
-        "additivi": additives["additivi"],
-        "additivi_sconosciuti": additives["sconosciuti"],
-        "punteggio_additivi": additives["punteggio"],
-        "additivi_dichiarati": additives["dichiarati"],
-        "grade": grade["valore"],
-        "nova": nova["valore"],
-        "etichette": _union(entries, "labels"),
-        "categorie": _union(entries, "categories"),
-        "prezzo": price["valore"],
-        "prezzo_base": price["base"],
-        "prezzo_osservazioni": price["osservazioni"],
-        "negozi": price["negozi"],
-        "punteggio_fonti": scores,
-        "conflitti": nutrients["conflicts"],
-        "fonti": sorted(entries),
-        "copertura": coverage,
-        "confidenza": confidence,
-        "flag": flags,
+        "name": identity["name"],
+        "brand": identity["brand"],
+        "quantity": identity["quantity"],
+        "nutrients": nutrients["values"],
+        "nutrient_provenance": nutrients["provenance"],
+        "additives": additives["additives"],
+        "unknown_additives": additives["unknown"],
+        "additive_score": additives["score"],
+        "additives_declared": additives["declared"],
+        "grade": grade["value"],
+        "nova": nova["value"],
+        "labels": _union(entries, "labels"),
+        "categories": _union(entries, "categories"),
+        "price": price["value"],
+        "price_basis": price["basis"],
+        "price_observations": price["observations"],
+        "stores": price["stores"],
+        "source_scores": scores,
+        "conflicts": nutrients["conflicts"],
+        "sources": sorted(entries),
+        "coverage": coverage,
+        "confidence": confidence,
+        "flags": flags,
     }
 
 
@@ -495,12 +495,12 @@ def merge_products(
     profiles: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     merged = [merge_group(entries, table, profiles) for entries in groups if entries]
-    merged.sort(key=lambda item: (norm_text(item["nome"]), item["barcode"]))
+    merged.sort(key=lambda item: (norm_text(item["name"]), item["barcode"]))
     return merged
 
 
 # --------------------------------------------------------------------------- #
-# Consenso sulle tabelle di rischio additivi
+# Consensus on the additive risk tables
 # --------------------------------------------------------------------------- #
 def _e_sort(key: str) -> tuple[int, str]:
     match = re.fullmatch(r"e(\d+)([a-z]*)", str(key).lower())
@@ -513,7 +513,7 @@ def merge_risk_tables(
     tables: Mapping[str, Mapping[str, float | None]],
     profiles: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Mediana pesata del rischio per E-number, con copertura e buchi."""
+    """Weighted median of the risk per E-number, with coverage and gaps."""
     numbers = sorted({str(key) for table in tables.values() for key in table}, key=_e_sort)
     total_weight = sum(_field_weight(source, "risk", profiles) for source in tables) or 1.0
     rows: list[dict[str, Any]] = []
@@ -548,18 +548,18 @@ def merge_risk_tables(
 
         reasons: list[str] = []
         if len(samples) < 2:
-            reasons.append("una sola fonte")
+            reasons.append("single source")
         if missing:
-            reasons.append("manca in: " + ", ".join(sorted(missing)))
+            reasons.append("missing in: " + ", ".join(sorted(missing)))
         if spread is not None and spread > RISK_SPREAD:
-            reasons.append(f"fonti discordi (±{spread:.0f})")
+            reasons.append(f"sources disagree (±{spread:.0f})")
 
         rows.append(
             {
                 "e_number": number,
                 "risk_consensus": median,
                 "n_sources": len(samples),
-                "fonti": sorted(source for source, _, _ in samples),
+                "sources": sorted(source for source, _, _ in samples),
                 "missing_in": sorted(missing),
                 "spread": round(float(spread), 1) if spread is not None else None,
                 "agreement": round(agreement, 3),

@@ -1,11 +1,11 @@
 """
-generic_01 — motore di scoring alimentare basato su Open Food Facts.
+generic_01 — food scoring engine based on Open Food Facts.
 
-Uso:
+Usage:
     python main.py scan 3017620422003
     python main.py scan 3017620422003 5449000000996 --json
-    python main.py file tests/fixtures/prodotto.json
-    python main.py batch barcodes.txt --workers 6 --out risultati.json
+    python main.py file tests/fixtures/product.json
+    python main.py batch barcodes.txt --workers 6 --out results.json
     python main.py additives --preservatives --missing-risk
 """
 from __future__ import annotations
@@ -88,7 +88,7 @@ def cmd_file(args: argparse.Namespace) -> int:
     try:
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        print(f"JSON non valido in {args.path}: {error}", file=sys.stderr)
+        print(f"Invalid JSON in {args.path}: {error}", file=sys.stderr)
         return 2
     raw = raw.get("product", raw)
     result = engine.score(normalize_product(raw))
@@ -121,7 +121,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
     text = json.dumps(out, indent=2, ensure_ascii=False)
     if args.out:
         Path(args.out).write_text(text + "\n", encoding="utf-8")
-        print(f"{len(payload)} prodotti valutati, {len(errors)} errori -> {args.out}")
+        print(f"{len(payload)} products scored, {len(errors)} errors -> {args.out}")
     else:
         print(text)
     return 0 if not errors else 1
@@ -156,61 +156,61 @@ def cmd_additives(args: argparse.Namespace) -> int:
 
     stats = table.stats()
     print(
-        f"Tabella: {stats['total']} additivi · {stats['preservatives']} conservanti · "
-        f"{stats['scored']} con punteggio · {stats['unscored']} da compilare"
+        f"Table: {stats['total']} additives · {stats['preservatives']} preservatives · "
+        f"{stats['scored']} scored · {stats['unscored']} to fill"
     )
     print()
-    print(f"{'E-number':<12}{'Rischio':>8}  {'Cons.':<6}Nome")
+    print(f"{'E-number':<12}{'Risk':>8}  {'Pres.':<6}Name")
     for row in rows:
         risk = "   -" if row.risk is None else f"{row.risk:>6.1f}"
-        flag = "si" if row.is_preservative else ""
-        print(f"{row.e_number:<12}{risk:>8}  {flag:<6}{row.name_it or row.name_en}")
+        flag = "yes" if row.is_preservative else ""
+        print(f"{row.e_number:<12}{risk:>8}  {flag:<6}{row.name_en or row.name_it}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="generic_01",
-        description="Motore di scoring alimentare (Open Food Facts)",
+        description="Food scoring engine (Open Food Facts)",
     )
     parser.add_argument("--version", action="version", version=f"generic_01 engine {ENGINE_VERSION}")
 
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--table", type=Path, default=None, help="CSV additivi (default data/additives.csv)")
-    common.add_argument("--json", action="store_true", help="Output JSON")
-    common.add_argument("--cache", type=Path, default=DEFAULT_CACHE, help="Cache SQLite")
-    common.add_argument("--no-cache", action="store_true", help="Ignora la cache")
+    common.add_argument("--table", type=Path, default=None, help="Additive CSV (default data/additives.csv)")
+    common.add_argument("--json", action="store_true", help="JSON output")
+    common.add_argument("--cache", type=Path, default=DEFAULT_CACHE, help="SQLite cache")
+    common.add_argument("--no-cache", action="store_true", help="Ignore the cache")
     common.add_argument("--base-url", default="https://world.openfoodfacts.org")
-    common.add_argument("--rpm", type=int, default=90, help="Richieste/minuto massime")
+    common.add_argument("--rpm", type=int, default=90, help="Maximum requests per minute")
     common.add_argument("--retries", type=int, default=3)
     common.add_argument("--w-nutrition", type=float, default=0.50)
     common.add_argument("--w-additives", type=float, default=0.35)
     common.add_argument("--w-processing", type=float, default=0.10)
     common.add_argument("--w-organic", type=float, default=0.05)
     common.add_argument("--worst-weight", type=float, default=0.65,
-                        help="Peso del peggior additivo nella componente additivi")
+                        help="Weight of the worst additive in the additive component")
     common.add_argument("--critical", type=float, default=70.0,
-                        help="Soglia di rischio per allerta critica")
+                        help="Risk threshold for a critical alert")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    scan = sub.add_parser("scan", parents=[common], help="Scansiona uno o piu' barcode")
+    scan = sub.add_parser("scan", parents=[common], help="Scan one or more barcodes")
     scan.add_argument("barcodes", nargs="+")
     scan.set_defaults(func=cmd_scan)
 
-    file_cmd = sub.add_parser("file", parents=[common], help="Valuta un JSON di Open Food Facts")
+    file_cmd = sub.add_parser("file", parents=[common], help="Score an Open Food Facts JSON")
     file_cmd.add_argument("path", type=Path)
     file_cmd.set_defaults(func=cmd_file)
 
-    batch = sub.add_parser("batch", parents=[common], help="Valuta una lista di barcode da file")
+    batch = sub.add_parser("batch", parents=[common], help="Score a list of barcodes from a file")
     batch.add_argument("barcodes_file", type=Path)
     batch.add_argument("--workers", type=int, default=4)
     batch.add_argument("--out", type=Path, default=None)
     batch.set_defaults(func=cmd_batch)
 
-    additives = sub.add_parser("additives", parents=[common], help="Ispeziona la tabella additivi")
-    additives.add_argument("--preservatives", action="store_true", help="Solo conservanti")
-    additives.add_argument("--missing-risk", action="store_true", help="Solo righe senza punteggio")
+    additives = sub.add_parser("additives", parents=[common], help="Inspect the additive table")
+    additives.add_argument("--preservatives", action="store_true", help="Preservatives only")
+    additives.add_argument("--missing-risk", action="store_true", help="Rows without a score only")
     additives.set_defaults(func=cmd_additives)
 
     return parser
@@ -223,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     except FileNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    except BrokenPipeError:  # es. `python main.py additives | head`
+    except BrokenPipeError:  # e.g. `python main.py additives | head`
         return 0
     except KeyboardInterrupt:
         return 130

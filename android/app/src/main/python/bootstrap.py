@@ -1,8 +1,8 @@
-"""Bootstrap del server Food Scanner dentro l'APK Android.
+"""Bootstrap of the Food Scanner server inside the Android APK.
 
-Il progetto Python viene copiato dagli asset in filesDir all'avvio dell'app.
-Qui aggiungiamo quella directory a sys.path e avviamo lo stesso server HTTP
-usato dalla UI desktop, in un thread separato.
+The Python project is copied from the assets into filesDir at app startup.
+Here we add that directory to sys.path and start the same HTTP server used by
+the desktop UI, in a separate thread.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _thread: threading.Thread | None = None
 
 
 def start(app_dir: str, port: int = 8765) -> int:
-    """Avvia il server una sola volta e restituisce la porta."""
+    """Start the server once and return the port."""
     global _server, _thread
 
     if _server is not None:
@@ -25,7 +25,7 @@ def start(app_dir: str, port: int = 8765) -> int:
 
     root = Path(app_dir).resolve()
     if not (root / "ui" / "server.py").is_file():
-        raise RuntimeError(f"UI Python non trovata in {root}")
+        raise RuntimeError(f"Python UI not found in {root}")
 
     os.chdir(root)
     sys.path.insert(0, str(root))

@@ -1,9 +1,9 @@
 """
-100 prodotti italiani casuali, con nomi, barcode EAN-13 e profili realistici.
+100 random Italian products, with names, EAN-13 barcodes and realistic profiles.
 
-Il dataset è deterministico: lo stesso seed produce gli stessi 100 prodotti, così
-un fallimento è sempre riproducibile. I test non usano la rete e verificano le
-invarianti del motore su categorie tipiche del mercato italiano.
+The dataset is deterministic: the same seed produces the same 100 products, so a
+failure is always reproducible. The tests do not use the network and check the
+engine invariants on categories typical of the Italian market.
 """
 from __future__ import annotations
 
