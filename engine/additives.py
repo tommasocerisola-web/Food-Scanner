@@ -1,10 +1,10 @@
 """
-Tabella additivi: lettura del CSV, lookup per chiave/E-number e rischio per additivo.
+Additive table: CSV loading, lookup by key/E-number and per-additive risk.
 
-La tabella e' la parte "compilabile": data/additives.csv contiene una riga per
-additivo con la colonna `risk_score` (0-100). Finche' un additivo non e'
-compilato, il motore usa un default per classe funzionale (documentato sotto) e
-marca il risultato come stimato, cosi' il report resta onesto.
+The table is the "editable" part: data/additives.csv holds one row per additive
+with a `risk_score` column (0-100). Until an additive is scored, the engine uses
+a default for its functional class (documented below) and marks the result as
+estimated, so the report stays honest.
 """
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ from typing import Iterable, Iterator
 
 DEFAULT_TABLE_PATH = Path(__file__).resolve().parent.parent / "data" / "additives.csv"
 
-# Rischio provvisorio per classe funzionale, usato SOLO per additivi non compilati.
-# Volutamente conservativo: il valore vero deve arrivare dalla tabella compilata.
+# Provisional risk per functional class, used ONLY for unscored additives.
+# Deliberately conservative: the real value must come from the curated table.
 DEFAULT_RISK_BY_CLASS: dict[str, float] = {
     "preservative": 40.0,
     "colour": 35.0,
@@ -46,8 +46,8 @@ DEFAULT_RISK_BY_CLASS: dict[str, float] = {
 FALLBACK_RISK = 30.0
 
 _KEY_LANG = re.compile(r"^[a-z]{2}:")
-# Open Food Facts usa varianti tipo en:e322i / en:e451i per lo stesso additivo.
-# Le lettere (e150a, e150b...) sono invece additivi distinti: non si toccano.
+# Open Food Facts uses variants such as en:e322i / en:e451i for the same additive.
+# Letter suffixes (e150a, e150b...) are distinct additives instead: leave them alone.
 _ROMAN_VARIANT = re.compile(r"^(e\d+)(i{1,3}|iv|v|vi{0,3}|ix|x)$", re.IGNORECASE)
 
 
@@ -79,10 +79,10 @@ class AdditiveRow:
 
     @property
     def display_name(self) -> str:
-        return self.name_it or self.name_en or self.e_number
+        return self.name_en or self.name_it or self.e_number
 
     def default_risk(self) -> tuple[float, bool]:
-        """(rischio, stimato). Gli additivi con `basis = classe` sono stime."""
+        """(risk, estimated). Additives with `basis = class` are estimates."""
         if self.risk is not None:
             return self.risk, self.basis.strip().lower().startswith("class")
         known = [DEFAULT_RISK_BY_CLASS[cls] for cls in self.classes if cls in DEFAULT_RISK_BY_CLASS]
@@ -92,14 +92,14 @@ class AdditiveRow:
 
 
 class AdditiveTable:
-    """Collezione di additivi indicizzata per chiave canonica e per nome."""
+    """Collection of additives indexed by canonical key and by name."""
 
     def __init__(self, rows: Iterable[AdditiveRow], source: Path | None = None) -> None:
         self.source = source
         self._rows: dict[str, AdditiveRow] = {}
         self._by_name: dict[str, AdditiveRow] = {}
-        # `_all` tiene una riga per E-number: `_rows` e' solo l'indice di lookup
-        # (chiave OFF, E-number, nome) e conterebbe due volte le varianti.
+        # `_all` keeps one row per E-number: `_rows` is only the lookup index
+        # (OFF key, E-number, name) and would count variants twice.
         self._all: dict[str, AdditiveRow] = {}
         for row in rows:
             self._all.setdefault(canonical(row.e_number), row)
@@ -110,15 +110,15 @@ class AdditiveTable:
                     self._by_name.setdefault(name.strip().lower(), row)
 
     # ------------------------------------------------------------------ #
-    # Costruzione
+    # Construction
     # ------------------------------------------------------------------ #
     @classmethod
     def load(cls, path: Path | str | None = None) -> "AdditiveTable":
         table_path = Path(path) if path else DEFAULT_TABLE_PATH
         if not table_path.exists():
             raise FileNotFoundError(
-                f"Tabella additivi non trovata: {table_path}\n"
-                "Generala con: python tools/build_additive_table.py"
+                f"Additive table not found: {table_path}\n"
+                "Generate it with: python tools/build_additive_table.py"
             )
         rows: list[AdditiveRow] = []
         with table_path.open(newline="", encoding="utf-8") as handle:
@@ -146,7 +146,7 @@ class AdditiveTable:
         return cls(rows, source=table_path)
 
     # ------------------------------------------------------------------ #
-    # Interrogazione
+    # Queries
     # ------------------------------------------------------------------ #
     def __len__(self) -> int:
         return len(self._all)
@@ -155,7 +155,7 @@ class AdditiveTable:
         return iter(self._all.values())
 
     def get(self, token: str) -> AdditiveRow | None:
-        """Risolve anche le varianti: 'en:e322i' -> riga E322."""
+        """Also resolves variants: 'en:e322i' -> E322 row."""
         key = canonical(token)
         row = self._rows.get(key)
         if row is not None:

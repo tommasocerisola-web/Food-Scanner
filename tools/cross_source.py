@@ -1,26 +1,26 @@
 """
-Confronto multi-fonte: prodotti in comune, tabella additivi di consenso, buchi.
+Multi-source comparison: shared products, consensus additive table, gaps.
 
-Il flusso pensato per piu' fonti (Open Food Facts, Yuka, una terza tabella):
+The flow designed for several sources (Open Food Facts, Yuka, a third table):
 
-  1. `match` prende gli export delle fonti, unisce i prodotti per barcode
-     (fallback su nome+marca) e scrive quanti prodotti sono in comune, dove le
-     fonti si contraddicono e quali additivi non esistono ancora nella tabella.
-  2. `table` prende una tabella di rischio per fonte, calcola il consenso
-     (mediana), segnala le righe discordi o mancanti e scrive la lista dei
-     "pezzi mancanti" da fixare.
+  1. `match` takes the source exports, merges products by barcode (falling back
+     to name+brand) and reports how many products are shared, where the sources
+     contradict each other and which additives are still missing from the table.
+  2. `table` takes a risk table per source, computes the consensus (median),
+     flags the discordant or missing rows and writes the list of "missing
+     pieces" to fix.
 
-Uso:
+Usage:
     python tools/cross_source.py match \
         --source off=export_off.json --source yuka=export_yuka.json \
-        --source terza=export_terza.csv --out out/match.json --csv out/match.csv
+        --source third=export_third.csv --out out/match.json --csv out/match.csv
 
     python tools/cross_source.py table \
-        --table off=data/additives.csv --table yuka=yuka_additivi.csv \
+        --table off=data/additives.csv --table yuka=yuka_additives.csv \
         --out data/additives.consensus.csv --gaps out/gaps.json
 
-Nessuna fonte viene modificata: il consenso e' una proposta, la tabella
-ufficiale (`data/additives.csv`) resta quella curata a mano.
+No source is ever modified: the consensus is a proposal, the official table
+(`data/additives.csv`) stays the curated one.
 """
 from __future__ import annotations
 
@@ -47,16 +47,16 @@ from engine.sources import (  # noqa: E402
     norm_text,
 )
 
-MAX_SPREAD = 15.0   # punti: oltre, due fonti si contraddicono sullo stesso prodotto
-SIMILARITY = 0.90   # somiglianza nome+marca per il match senza barcode
+MAX_SPREAD = 15.0   # points: beyond this, two sources contradict on the same product
+SIMILARITY = 0.90   # name+brand similarity for matching without a barcode
 
 
 # --------------------------------------------------------------------------- #
-# Matching prodotti
+# Product matching
 # --------------------------------------------------------------------------- #
 @dataclass
 class Cluster:
-    """Lo stesso prodotto visto da piu' fonti."""
+    """The same product seen by several sources."""
 
     key: str
     barcode: str = ""
@@ -79,7 +79,7 @@ class Cluster:
 def cluster_products(
     products_by_source: dict[str, list[SourceProduct]],
 ) -> tuple[dict[str, Cluster], list[dict[str, Any]]]:
-    """Unisce i prodotti delle fonti; restituisce cluster e match ambigui."""
+    """Merge the products of the sources; returns clusters and ambiguous matches."""
     clusters: dict[str, Cluster] = {}
     loose: list[SourceProduct] = []
     ambiguous: list[dict[str, Any]] = []
@@ -116,24 +116,24 @@ def cluster_products(
                 cluster.name = product.name
             if not cluster.brand:
                 cluster.brand = product.brand
-            cluster.how = "barcode+nome"
+            cluster.how = "barcode+name"
         elif len(candidates) > 1:
             ambiguous.append(
                 {
-                    "fonte": product.source,
-                    "nome": product.name,
-                    "marca": product.brand,
-                    "candidati": [candidate.barcode or candidate.key for candidate in candidates],
+                    "source": product.source,
+                    "name": product.name,
+                    "brand": product.brand,
+                    "candidates": [candidate.barcode or candidate.key for candidate in candidates],
                 }
             )
         else:
-            cluster = clusters.get("nome:" + name_key(product.name, product.brand))
+            cluster = clusters.get("name:" + name_key(product.name, product.brand))
             if cluster is None:
                 cluster = Cluster(
-                    key="nome:" + name_key(product.name, product.brand),
+                    key="name:" + name_key(product.name, product.brand),
                     name=product.name,
                     brand=product.brand,
-                    how="nome",
+                    how="name",
                 )
                 clusters[cluster.key] = cluster
             if product.source in cluster.entries:
@@ -145,13 +145,13 @@ def cluster_products(
 
 
 def _best_candidates(product: SourceProduct, clusters: Any) -> list[Cluster]:
-    """Cluster compatibili per nome+marca, solo se il migliore e' netto."""
+    """Compatible clusters by name+brand, only when the best one is clear-cut."""
     target = name_key(product.name, product.brand)
     if not target:
         return []
     scored: list[tuple[float, Cluster]] = []
     for cluster in clusters:
-        if cluster.key.startswith("nome:"):
+        if cluster.key.startswith("name:"):
             continue
         if cluster.entries.get(product.source) is not None:
             continue
@@ -190,10 +190,10 @@ def build_report(
         with_barcode = sum(1 for product in products if barcode_key(product.barcode))
         stats[source] = {
             "file": str(paths.get(source, "")),
-            "prodotti": len(products),
-            "con_barcode": with_barcode,
-            "senza_barcode": len(products) - with_barcode,
-            "doppioni": sum(cluster.duplicates.get(source, 0) for cluster in clusters.values()),
+            "products": len(products),
+            "with_barcode": with_barcode,
+            "without_barcode": len(products) - with_barcode,
+            "duplicates": sum(cluster.duplicates.get(source, 0) for cluster in clusters.values()),
         }
 
     unknown: dict[str, set[str]] = {}
@@ -204,7 +204,7 @@ def build_report(
                     unknown.setdefault(tag, set()).add(product.label)
 
     payloads = [_cluster_payload(cluster, sources, table) for cluster in clusters.values()]
-    payloads.sort(key=lambda item: (norm_text(item["nome"]), item["barcode"] or item["chiave"]))
+    payloads.sort(key=lambda item: (norm_text(item["name"]), item["barcode"] or item["key"]))
 
     common = [cluster for cluster in clusters.values() if len(cluster.entries) > 1]
     single = {
@@ -215,15 +215,15 @@ def build_report(
     return {
         "generator": "generic_01 cross_source",
         "sources": stats,
-        "totale_prodotti": sum(len(products) for products in products_by_source.values()),
-        "cluster": len(clusters),
-        "in_comune": len(common),
-        "solo_in_una_fonte": single,
-        "ambigui": ambiguous,
-        "additivi_sconosciuti": [
-            {"tag": tag, "prodotti": sorted(names)} for tag, names in sorted(unknown.items())
+        "total_products": sum(len(products) for products in products_by_source.values()),
+        "clusters": len(clusters),
+        "shared": len(common),
+        "single_source": single,
+        "ambiguous": ambiguous,
+        "unknown_additives": [
+            {"tag": tag, "products": sorted(names)} for tag, names in sorted(unknown.items())
         ],
-        "prodotti": payloads,
+        "products": payloads,
     }
 
 
@@ -236,46 +236,46 @@ def _cluster_payload(cluster: Cluster, sources: list[str], table: AdditiveTable 
 
     flags: list[str] = []
     if missing:
-        flags.append("manca_in:" + ",".join(missing))
+        flags.append("missing_in:" + ",".join(missing))
     if cluster.spread > MAX_SPREAD:
-        flags.append(f"score_divergenti:{cluster.spread:g}")
+        flags.append(f"score_divergent:{cluster.spread:g}")
     if discordant:
-        flags.append("additivi_discordanti")
+        flags.append("additives_conflict")
     if unknown:
-        flags.append("additivi_sconosciuti:" + ",".join(unknown))
+        flags.append("unknown_additives:" + ",".join(unknown))
 
     return {
-        "chiave": cluster.key,
+        "key": cluster.key,
         "barcode": cluster.barcode,
-        "nome": cluster.name or next((entry.name for entry in cluster.entries.values()), ""),
-        "marca": cluster.brand or next((entry.brand for entry in cluster.entries.values()), ""),
+        "name": cluster.name or next((entry.name for entry in cluster.entries.values()), ""),
+        "brand": cluster.brand or next((entry.brand for entry in cluster.entries.values()), ""),
         "match": cluster.how,
-        "fonti": sorted(cluster.entries),
+        "sources": sorted(cluster.entries),
         "scores": {source: score for source, score in cluster.scores.items()},
         "spread": cluster.spread,
-        "manca_in": missing,
-        "additivi": {source: sorted(tags) for source, tags in tags_by_source.items()},
-        "additivi_sconosciuti": unknown,
-        "flag": flags,
+        "missing_in": missing,
+        "additives": {source: sorted(tags) for source, tags in tags_by_source.items()},
+        "unknown_additives": unknown,
+        "flags": flags,
     }
 
 
 def write_match_csv(path: Path, report: dict[str, Any], sources: list[str]) -> None:
-    fields = ["barcode", "nome", "marca", "fonti", "spread", "manca_in", "additivi_discordanti", "additivi_sconosciuti"]
+    fields = ["barcode", "name", "brand", "sources", "spread", "missing_in", "additives_conflict", "unknown_additives"]
     fields += [f"score_{_safe(source)}" for source in sources]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        for item in report["prodotti"]:
+        for item in report["products"]:
             row = {
                 "barcode": item["barcode"],
-                "nome": item["nome"],
-                "marca": item["marca"],
-                "fonti": ";".join(item["fonti"]),
+                "name": item["name"],
+                "brand": item["brand"],
+                "sources": ";".join(item["sources"]),
                 "spread": item["spread"],
-                "manca_in": ";".join(item["manca_in"]),
-                "additivi_discordanti": "si" if "additivi_discordanti" in item["flag"] else "",
-                "additivi_sconosciuti": ";".join(item["additivi_sconosciuti"]),
+                "missing_in": ";".join(item["missing_in"]),
+                "additives_conflict": "yes" if "additives_conflict" in item["flags"] else "",
+                "unknown_additives": ";".join(item["unknown_additives"]),
             }
             for source in sources:
                 row[f"score_{_safe(source)}"] = item["scores"].get(source, "")
@@ -283,7 +283,7 @@ def write_match_csv(path: Path, report: dict[str, Any], sources: list[str]) -> N
 
 
 # --------------------------------------------------------------------------- #
-# Tabelle di rischio e consenso
+# Risk tables and consensus
 # --------------------------------------------------------------------------- #
 @dataclass
 class RiskRow:
@@ -295,12 +295,12 @@ class RiskRow:
 
 E_FIELDS = ("e_number", "e", "code", "codice", "additive", "additivo")
 RISK_FIELDS = ("risk_score", "risk", "score", "danger", "pericolosita", "punteggio")
-NAME_FIELDS = ("name_it", "name", "nome", "name_en")
+NAME_FIELDS = ("name", "name_en", "name_it", "nome")
 WHY_FIELDS = ("why", "reason", "motivo", "spiegazione")
 
 
 def load_risk_table(path: Path | str) -> dict[str, RiskRow]:
-    """Legge una tabella di rischio (CSV o JSON) indicizzata per E-number."""
+    """Read a risk table (CSV or JSON) indexed by E-number."""
     text = Path(path).read_text(encoding="utf-8-sig", errors="replace")
     if not text.strip():
         return {}
@@ -321,7 +321,7 @@ def _table_records(payload: Any) -> list[Any]:
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
-        # Un singolo record (non una mappa E-number -> rischio).
+        # A single record (not an E-number -> risk map).
         if {str(key).lower() for key in payload} & set(E_FIELDS):
             return [payload]
         for key in ("additives", "rows", "data", "items", "additivi"):
@@ -362,7 +362,7 @@ def _risk_row(record: dict[str, Any]) -> RiskRow | None:
 
 
 def merge_tables(tables: dict[str, dict[str, RiskRow]]) -> list[dict[str, Any]]:
-    """Consenso per E-number: mediana, accordo, fonti mancanti, motivo del fix."""
+    """Consensus per E-number: median, agreement, missing sources, fix reason."""
     keys = sorted(set().union(*(set(table) for table in tables.values())), key=_e_sort)
     merged: list[dict[str, Any]] = []
     for key in keys:
@@ -378,13 +378,13 @@ def merge_tables(tables: dict[str, dict[str, RiskRow]]) -> list[dict[str, Any]]:
         missing = [source for source in tables if source not in present]
         reasons: list[str] = []
         if consensus is None:
-            reasons.append("nessun punteggio")
+            reasons.append("no score")
         if missing:
-            reasons.append("manca in: " + ", ".join(missing))
+            reasons.append("missing in: " + ", ".join(missing))
         if spread > 25:
-            reasons.append(f"fonti discordi (±{spread:g})")
+            reasons.append(f"sources disagree (±{spread:g})")
         if len(risks) < len(present):
-            reasons.append("punteggio mancante in una fonte")
+            reasons.append("score missing in one source")
 
         merged.append(
             {
@@ -438,10 +438,10 @@ def _parse_specs(values: list[str]) -> dict[str, Path]:
         name, separator, raw_path = value.partition("=")
         name, raw_path = name.strip(), raw_path.strip()
         if not separator or not name or not raw_path:
-            raise SystemExit(f"formato richiesto nome=percorso, ricevuto: {value}")
+            raise SystemExit(f"expected name=path, received: {value}")
         specs[name] = Path(raw_path)
     if not specs:
-        raise SystemExit("specifica almeno una fonte")
+        raise SystemExit("specify at least one source")
     return specs
 
 
@@ -450,11 +450,11 @@ def _parse_score_max(values: list[str]) -> dict[str, float]:
     for value in values:
         name, separator, raw = value.partition("=")
         if not separator or not name.strip():
-            raise SystemExit(f"formato richiesto nome=scala, ricevuto: {value}")
+            raise SystemExit(f"expected name=scale, received: {value}")
         try:
             limits[name.strip()] = float(raw)
         except ValueError as error:
-            raise SystemExit(f"scala non valida per {name}: {raw}") from error
+            raise SystemExit(f"invalid scale for {name}: {raw}") from error
     return limits
 
 
@@ -465,14 +465,14 @@ def cmd_match(args: argparse.Namespace) -> int:
         name: load_source(name, path, limits.get(name, 100.0)) for name, path in specs.items()
     }
     if not any(products.values()):
-        print("nessun prodotto caricato dalle fonti indicate", file=sys.stderr)
+        print("no product loaded from the given sources", file=sys.stderr)
         return 2
 
     table = None
     if args.additives:
         table_path = Path(args.additives)
         if not table_path.exists():
-            raise FileNotFoundError(f"tabella additivi non trovata: {table_path}")
+            raise FileNotFoundError(f"additive table not found: {table_path}")
         table = AdditiveTable.load(table_path)
 
     clusters, ambiguous = cluster_products(products)
@@ -487,9 +487,9 @@ def cmd_match(args: argparse.Namespace) -> int:
         write_match_csv(csv_path, report, list(specs))
 
     print(
-        f"{report['totale_prodotti']} prodotti · {report['in_comune']} in comune · "
-        f"{len(report['ambigui'])} ambigui · "
-        f"{len(report['additivi_sconosciuti'])} additivi sconosciuti -> {out}"
+        f"{report['total_products']} products · {report['shared']} shared · "
+        f"{len(report['ambiguous'])} ambiguous · "
+        f"{len(report['unknown_additives'])} unknown additives -> {out}"
     )
     return 0
 
@@ -498,7 +498,7 @@ def cmd_table(args: argparse.Namespace) -> int:
     specs = _parse_specs(args.table)
     tables = {name: load_risk_table(path) for name, path in specs.items()}
     if not any(tables.values()):
-        print("nessuna riga additivo caricata dalle tabelle indicate", file=sys.stderr)
+        print("no additive row loaded from the given tables", file=sys.stderr)
         return 2
 
     rows = merge_tables(tables)
@@ -512,7 +512,7 @@ def cmd_table(args: argparse.Namespace) -> int:
         gaps_path.parent.mkdir(parents=True, exist_ok=True)
         gaps_path.write_text(
             json.dumps(
-                {"sources": {name: len(table) for name, table in tables.items()}, "totale": len(gaps), "gaps": gaps},
+                {"sources": {name: len(table) for name, table in tables.items()}, "total": len(gaps), "gaps": gaps},
                 indent=2,
                 ensure_ascii=False,
             )
@@ -521,31 +521,31 @@ def cmd_table(args: argparse.Namespace) -> int:
         )
 
     print(
-        f"{len(rows)} additivi · {len(rows) - len(gaps)} concordi · {len(gaps)} da fixare -> {out}"
+        f"{len(rows)} additives · {len(rows) - len(gaps)} agreeing · {len(gaps)} to fix -> {out}"
     )
     if args.gaps:
-        print(f"lista dei pezzi mancanti -> {args.gaps}")
+        print(f"list of missing pieces -> {args.gaps}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cross_source",
-        description="Confronta fonti alimentari: prodotti in comune e tabelle di consenso",
+        description="Compare food sources: shared products and consensus tables",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    match = sub.add_parser("match", help="Trova i prodotti in comune tra piu' fonti")
-    match.add_argument("--source", action="append", default=[], metavar="NOME=FILE")
-    match.add_argument("--additives", default="data/additives.csv", help="Tabella additivi per rilevare i tag sconosciuti")
-    match.add_argument("--score-max", action="append", default=[], metavar="NOME=SCALA",
-                       help="Scala del punteggio per fonte (default 100)")
+    match = sub.add_parser("match", help="Find the products shared by several sources")
+    match.add_argument("--source", action="append", default=[], metavar="NAME=FILE")
+    match.add_argument("--additives", default="data/additives.csv", help="Additive table used to spot unknown tags")
+    match.add_argument("--score-max", action="append", default=[], metavar="NAME=SCALE",
+                       help="Score scale per source (default 100)")
     match.add_argument("--out", default="out/match.json")
     match.add_argument("--csv", default="out/match.csv")
     match.set_defaults(func=cmd_match)
 
-    table = sub.add_parser("table", help="Unisce le tabelle di rischio e trova i buchi")
-    table.add_argument("--table", action="append", default=[], metavar="NOME=FILE")
+    table = sub.add_parser("table", help="Merge the risk tables and find the gaps")
+    table.add_argument("--table", action="append", default=[], metavar="NAME=FILE")
     table.add_argument("--out", default="data/additives.consensus.csv")
     table.add_argument("--gaps", default="out/gaps.json")
     table.set_defaults(func=cmd_table)
@@ -566,7 +566,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _safe(source: str) -> str:
-    return re.sub(r"[^0-9A-Za-z]+", "_", source).strip("_").lower() or "fonte"
+    return re.sub(r"[^0-9A-Za-z]+", "_", source).strip("_").lower() or "source"
 
 
 def _first(record: dict[str, Any], fields: tuple[str, ...]) -> Any:

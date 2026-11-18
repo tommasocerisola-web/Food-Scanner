@@ -1,4 +1,4 @@
-"""Motore di scoring food: Open Food Facts -> punteggio 0-100 spiegabile."""
+"""Food scoring engine: Open Food Facts -> explainable 0-100 score."""
 from __future__ import annotations
 
 from .additives import AdditiveRow, AdditiveTable, DEFAULT_TABLE_PATH

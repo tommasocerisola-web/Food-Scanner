@@ -1,13 +1,13 @@
 """
-Motore di scoring: Nutri-Score ricalibrato + rischio per singolo additivo.
+Scoring engine: recalibrated Nutri-Score + per-additive risk.
 
-Differenza chiave rispetto a Yuka: Yuka penalizza *quanti* additivi ci sono,
-quindi un solo conservante molto tossico dentro un prodotto altrimenti pulito
-viene "diluito". Qui ogni additivo porta il proprio rischio 0-100 e il punteggio
-del peggiore domina la componente additivi (65% del peso della componente).
+Key difference from Yuka: Yuka penalises *how many* additives a product has, so a
+single very toxic preservative inside an otherwise clean product gets "diluted".
+Here every additive carries its own 0-100 risk and the worst one dominates the
+additive component (65% of the component weight).
 
-Score finale = media pesata di componenti note (se un dato manca, i pesi delle
-altre componenti vengono rinormalizzati e la `confidence` scende).
+Final score = weighted average of the known components (if a value is missing,
+the other weights are renormalized and `confidence` drops).
 """
 from __future__ import annotations
 
@@ -30,10 +30,10 @@ from .models import (
 ENGINE_VERSION = "0.3-beta"
 
 # --------------------------------------------------------------------------- #
-# Tabelle Nutri-Score (per 100 g)
+# Nutri-Score tables (per 100 g)
 # --------------------------------------------------------------------------- #
-# Soglie dei punti negativi/positivi dell'algoritmo Nutri-Score 2017 (alimenti
-# solidi). Ogni soglia superata vale 1 punto; il massimo e' indicato tra parentesi.
+# Negative/positive point thresholds of the 2017 Nutri-Score algorithm (solid
+# foods). Each crossed threshold is worth 1 point; the maximum is in parentheses.
 SOLID_THRESHOLDS: dict[str, tuple[float, ...]] = {
     "energy_kcal": (80, 160, 240, 320, 400, 480, 560, 640, 720, 800),  # max 10
     "sugars": (4.5, 9, 13.5, 18, 22.5, 27, 31, 36, 40, 45),  # max 10
@@ -46,13 +46,13 @@ BEVERAGE_THRESHOLDS: dict[str, tuple[float, ...]] = {
     "energy_kcal": (0, 7.2, 14.3, 21.5, 28.7, 35.9, 43.0, 50.2, 57.4, 64.5),  # 0..270 kJ
     "sugars": (0, 1.5, 3, 4.5, 6, 7.5, 9, 10.5, 12, 13.5),
 }
-# Verdure/frutta/frutta a guscio in percentuale sul totale.
+# Fruit/vegetables/nuts as a percentage of the total.
 FRUIT_THRESHOLDS: tuple[tuple[float, float], ...] = ((40, 1), (60, 2), (80, 5))
 BEVERAGE_FRUIT_THRESHOLDS: tuple[tuple[float, float], ...] = ((40, 2), (60, 4), (80, 10))
 
-# Conversione Nutri-Score -> 0-100 a fasce, allineata alle lettere A-E.
-# Una mappatura lineare semplice (-15..40) premierebbe troppo i prodotti medi:
-# un Nutri-Score 0 (fascia B/C) finirebbe a 72/100. Qui invece:
+# Nutri-Score -> 0-100 band conversion, aligned with the A-E letters.
+# A plain linear mapping (-15..40) would reward average products too much:
+# a Nutri-Score of 0 (band B/C) would end up at 72/100. Here instead:
 #   A (<= -1) -> 85..100 · B (0..2) -> 70..85 · C (3..10) -> 50..70
 #   D (11..18) -> 25..50 · E (>= 19) -> 0..25
 SOLID_NS_BANDS: tuple[tuple[float, float, float], ...] = (
@@ -72,19 +72,19 @@ BEVERAGE_NS_BANDS: tuple[tuple[float, float, float], ...] = (
     (20.0, 0.0, 0.0),
 )
 
-# NOVA (grado di lavorazione industriale) -> componente 0-100.
+# NOVA (degree of industrial processing) -> 0-100 component.
 NOVA_SCORES: dict[int, float] = {1: 100.0, 2: 80.0, 3: 55.0, 4: 20.0}
 
 _NUTRIENT_LABELS = {
-    "energy_kcal": ("Energia", "kcal"),
-    "sugars": ("Zuccheri", "g"),
-    "saturated_fat": ("Grassi saturi", "g"),
-    "salt": ("Sale", "g"),
+    "energy_kcal": ("Energy", "kcal"),
+    "sugars": ("Sugars", "g"),
+    "saturated_fat": ("Saturated fat", "g"),
+    "salt": ("Salt", "g"),
 }
 _POSITIVE_LABELS = {
-    "fiber": ("Fibre", "fiber", "g"),
-    "protein": ("Proteine", "protein", "g"),
-    "fruits_veg_nuts": ("Frutta/verdura", "fruits_veg_nuts", "%"),
+    "fiber": ("Fiber", "fiber", "g"),
+    "protein": ("Protein", "protein", "g"),
+    "fruits_veg_nuts": ("Fruits/vegetables", "fruits_veg_nuts", "%"),
 }
 
 
@@ -109,24 +109,24 @@ class Weights:
 
 @dataclass(frozen=True)
 class EngineConfig:
-    """Parametri tarabili dell'algoritmo (il "ricalibraggio" richiesto)."""
+    """Tunable algorithm parameters (the requested "recalibration")."""
 
     weights: Weights = field(default_factory=Weights)
-    # Quanto il singolo additivo peggiore pesa rispetto alla media degli additivi.
+    # How much the single worst additive weighs against the average additive.
     worst_additive_weight: float = 0.65
-    # Pressione aggiuntiva dovuta al numero di additivi (oltre i primi 2).
+    # Extra pressure coming from the number of additives (beyond the first 2).
     additive_count_step: float = 2.5
     additive_count_free: int = 2
     additive_count_cap: float = 10.0
-    # Soglie di allerta sui singoli additivi.
+    # Alert thresholds on individual additives.
     critical_risk: float = 70.0
     warning_risk: float = 45.0
-    # Il biologico non deve penalizzare: neutro 50, premio pieno se certificato.
+    # Organic must not penalise: neutral 50, full bonus when certified.
     organic_neutral: float = 50.0
 
 
 class ScoreEngine:
-    """Motore puro e senza I/O: riceve un ProductRecord, restituisce uno ScoreResult."""
+    """Pure engine with no I/O: takes a ProductRecord, returns a ScoreResult."""
 
     def __init__(self, table: AdditiveTable | None = None, config: EngineConfig | None = None) -> None:
         self.table = table
@@ -134,7 +134,7 @@ class ScoreEngine:
         self.weights = self.config.weights.normalized()
 
     # ------------------------------------------------------------------ #
-    # API principale
+    # Main API
     # ------------------------------------------------------------------ #
     def score(self, product: ProductRecord, table: AdditiveTable | None = None) -> ScoreResult:
         table = table or self.table
@@ -153,9 +153,9 @@ class ScoreEngine:
             if total_weight
             else 50.0
         )
-        # Shrinkage: con dati incompleti il punteggio non deve dichiarare
-        # eccellenza (un prodotto vuoto non e' "ottimo"): si avvicina a 50 in
-        # proporzione alla copertura dei dati.
+        # Shrinkage: with incomplete data the score must not claim excellence
+        # (an empty product is not "great"): it moves towards 50 in proportion
+        # to the data coverage.
         adjusted = 50.0 + (raw - 50.0) * total_weight
         score = int(round(max(0.0, min(100.0, adjusted))))
         additive_coverage = (
@@ -175,7 +175,7 @@ class ScoreEngine:
         )
 
     # ------------------------------------------------------------------ #
-    # Additivi
+    # Additives
     # ------------------------------------------------------------------ #
     def _resolve_additives(self, product: ProductRecord, table: AdditiveTable | None) -> tuple[AdditiveHit, ...]:
         if table is None:
@@ -214,7 +214,7 @@ class ScoreEngine:
                 name="additives",
                 score=100.0,
                 weight=self.weights.additives if self.table is not None else 0.0,
-                details={"count": 0, "note": "nessun additivo dichiarato"},
+                details={"count": 0, "note": "no declared additives"},
             )
 
         risks = [hit.risk for hit in hits]
@@ -241,7 +241,7 @@ class ScoreEngine:
         )
 
     # ------------------------------------------------------------------ #
-    # Nutrienti
+    # Nutrients
     # ------------------------------------------------------------------ #
     def _nutrition_component(self, product: ProductRecord) -> ComponentScore:
         score, details = self.nutrition_score(product.nutriments, product.is_beverage)
@@ -258,7 +258,7 @@ class ScoreEngine:
         present, minimum = _key_nutrient_coverage(facts, is_beverage)
         if present < minimum:
             return None, {
-                "missing": f"dati nutrizionali incompleti ({present}/{4 if not is_beverage else 2} valori chiave)",
+                "missing": f"incomplete nutrition data ({present}/{4 if not is_beverage else 2} key values)",
                 "coverage": f"{present}/{4 if not is_beverage else 2}",
             }
 
@@ -295,7 +295,7 @@ class ScoreEngine:
         t = SOLID_THRESHOLDS
         salt = facts.salt
         if salt is None and facts.sodium is not None:
-            salt = facts.sodium * 2.5  # 1 g di sodio = 2.5 g di sale
+            salt = facts.sodium * 2.5  # 1 g of sodium = 2.5 g of salt
 
         negative = {
             "energy_kcal": self._points(facts.kcal, t["energy_kcal"]),
@@ -309,8 +309,8 @@ class ScoreEngine:
         protein_points = self._points(facts.protein, t["protein"])
         fruit_points = _fruit_points(facts.fruits_veg_nuts, FRUIT_THRESHOLDS)
 
-        # Regola Nutri-Score: se i punti negativi sono >= 11 e la frutta < 5,
-        # le proteine non contano (evita di premiare snack proteici salati).
+        # Nutri-Score rule: if negative points are >= 11 and fruit is < 5,
+        # protein does not count (avoids rewarding salty protein snacks).
         if negative["total"] >= 11 and fruit_points < 5:
             protein_points = 0
 
@@ -340,7 +340,7 @@ class ScoreEngine:
         return negative, positive
 
     # ------------------------------------------------------------------ #
-    # Lavorazione e biologico
+    # Processing and organic
     # ------------------------------------------------------------------ #
     def _processing_component(self, product: ProductRecord, hits: tuple[AdditiveHit, ...]) -> ComponentScore:
         nova = product.nova_group
@@ -351,7 +351,7 @@ class ScoreEngine:
                 weight=self.weights.processing,
                 details={"nova_group": nova, "estimated": False},
             )
-        # Stima prudente quando NOVA manca: pochi additivi = poco lavorato.
+        # Cautious estimate when NOVA is missing: few additives = little processed.
         if not hits:
             return ComponentScore(
                 name="processing",
@@ -377,7 +377,7 @@ class ScoreEngine:
         )
 
     # ------------------------------------------------------------------ #
-    # Spiegazioni
+    # Explanations
     # ------------------------------------------------------------------ #
     def _reasons(
         self,
@@ -392,7 +392,7 @@ class ScoreEngine:
 
         if nutrition.score is None:
             reasons.append(
-                "Nutrienti non valutati: " + str(nutrition.details.get("missing", "dati insufficienti"))
+                "Nutrients not scored: " + str(nutrition.details.get("missing", "insufficient data"))
             )
         else:
             values = {
@@ -406,38 +406,38 @@ class ScoreEngine:
                     continue
                 label, unit = _NUTRIENT_LABELS.get(key, (key, ""))
                 value = values.get(key, (None, ""))[0]
-                shown = "n/d" if value is None else f"{value:g} {unit}"
-                reasons.append(f"{label} {shown}/100 g: {points}/10 punti negativi")
+                shown = "n/a" if value is None else f"{value:g} {unit}"
+                reasons.append(f"{label} {shown}/100 g: {points}/10 negative points")
             for key, points in nutrition.details.get("positive_points", {}).items():
                 if key == "total" or not points:
                     continue
                 label, attribute, unit = _POSITIVE_LABELS.get(key, (key, "", ""))
                 value = getattr(facts, attribute) if attribute else None
-                shown = "n/d" if value is None else f"{value:g} {unit}"
-                reasons.append(f"{label} {shown}: {points} punti positivi")
+                shown = "n/a" if value is None else f"{value:g} {unit}"
+                reasons.append(f"{label} {shown}: {points} positive points")
 
         if not hits:
-            reasons.append("Additivi: nessuno dichiarato in etichetta.")
+            reasons.append("Additives: none declared on the label.")
         else:
             top = hits[0]
             suffix = f" \u2014 {top.why}" if top.why else ""
             reasons.append(
-                f"Additivo peggiore: {top.e_number} ({top.name}) rischio {top.risk:.0f}/100{suffix}"
+                f"Worst additive: {top.e_number} ({top.name}) risk {top.risk:.0f}/100{suffix}"
             )
             if len(hits) > 3:
-                reasons.append(f"{len(hits)} additivi dichiarati: il peso maggiore va al peggiore.")
+                reasons.append(f"{len(hits)} declared additives: the worst one carries the most weight.")
 
         if product.nova_group:
-            label = {1: "non lavorato", 2: "minimamente lavorato", 3: "lavorato", 4: "ultra-processato"}.get(
-                product.nova_group, f"gruppo {product.nova_group}"
+            label = {1: "unprocessed", 2: "minimally processed", 3: "processed", 4: "ultra-processed"}.get(
+                product.nova_group, f"group {product.nova_group}"
             )
-            reasons.append(f"Lavorazione NOVA {product.nova_group}: {label}.")
+            reasons.append(f"Processing NOVA {product.nova_group}: {label}.")
         if product.organic:
-            reasons.append("Certificato biologico: bonus in etichetta.")
+            reasons.append("Certified organic: label bonus.")
         return tuple(reasons)
 
     # ------------------------------------------------------------------ #
-    # Allerte
+    # Alerts
     # ------------------------------------------------------------------ #
     def _alerts(self, hits: tuple[AdditiveHit, ...], product: ProductRecord) -> tuple[Alert, ...]:
         alerts: list[Alert] = []
@@ -445,20 +445,20 @@ class ScoreEngine:
             if hit.risk >= self.config.critical_risk:
                 alerts.append(
                     Alert(
-                        level="critico",
+                        level="critical",
                         code="additive_critical",
                         message=(
-                            f"{hit.e_number} ({hit.name}) rischio {hit.risk:.0f}/100"
-                            + (" [punteggio stimato]" if hit.risk_estimated else "")
+                            f"{hit.e_number} ({hit.name}) risk {hit.risk:.0f}/100"
+                            + (" [estimated score]" if hit.risk_estimated else "")
                         ),
                     )
                 )
             elif hit.risk >= self.config.warning_risk:
                 alerts.append(
                     Alert(
-                        level="attenzione",
+                        level="warning",
                         code="additive_warning",
-                        message=f"{hit.e_number} ({hit.name}) rischio {hit.risk:.0f}/100",
+                        message=f"{hit.e_number} ({hit.name}) risk {hit.risk:.0f}/100",
                     )
                 )
         if len(hits) > 5:
@@ -466,24 +466,24 @@ class ScoreEngine:
                 Alert(
                     level="info",
                     code="many_additives",
-                    message=f"{len(hits)} additivi dichiarati",
+                    message=f"{len(hits)} declared additives",
                 )
             )
         if product.nova_group == 4:
-            alerts.append(Alert(level="info", code="ultra_processed", message="Prodotto ultra-processato (NOVA 4)"))
+            alerts.append(Alert(level="info", code="ultra_processed", message="Ultra-processed product (NOVA 4)"))
         if product.nutrition_data_per and product.nutrition_data_per.lower() != "100g":
             alerts.append(
                 Alert(
                     level="info",
                     code="per_serving",
-                    message=f"Dati nutrizionali per {product.nutrition_data_per}: verifica i valori per 100 g/ml",
+                    message=f"Nutrition data per {product.nutrition_data_per}: check the values per 100 g/ml",
                 )
             )
         return tuple(alerts)
 
 
 def _declared_dose(product: ProductRecord, row: Any) -> float | None:
-    """Percentuale dichiarata negli ingredienti, se Open Food Facts la stima."""
+    """Percentage declared in the ingredients, when Open Food Facts estimates it."""
     for key in (row.key, f"en:{row.e_number.lower()}", f"en:{row.key.split(':', 1)[-1]}"):
         if key in product.additive_doses:
             return product.additive_doses[key]
@@ -491,10 +491,10 @@ def _declared_dose(product: ProductRecord, row: Any) -> float | None:
 
 
 def _dose_factor(percent: float | None) -> float:
-    """Riduce il rischio quando la dose dichiarata e' molto bassa.
+    """Lowers the risk when the declared dose is very low.
 
-    0,01% -> 0,30 · 0,1% -> 0,55 · 1% -> 0,80 · >=10% -> 1,00.
-    Conservativo: senza dato la dose non riduce nulla.
+    0.01% -> 0.30 · 0.1% -> 0.55 · 1% -> 0.80 · >=10% -> 1.00.
+    Conservative: without the data the dose reduces nothing.
     """
     if percent is None or percent <= 0:
         return 1.0
@@ -512,11 +512,11 @@ def _fruit_points(percent: float | None, thresholds: tuple[tuple[float, float], 
 
 
 def _key_nutrient_coverage(facts: NutrientFacts, is_beverage: bool) -> tuple[int, int]:
-    """(valori chiave presenti, minimo accettabile).
+    """(key values present, acceptable minimum).
 
-    Calcolare lo score con un solo valore e trattare gli altri come 0 gonfia il
-    risultato: sotto il minimo la componente nutrienti vale None (peso
-    rinormalizzato, confidence piu' bassa).
+    Scoring with a single value and treating the others as 0 inflates the
+    result: below the minimum the nutrition component is None (weight
+    renormalized, lower confidence).
     """
     if is_beverage:
         return sum(value is not None for value in (facts.kcal, facts.sugars)), 2
@@ -529,7 +529,7 @@ def _key_nutrient_coverage(facts: NutrientFacts, is_beverage: bool) -> tuple[int
 
 
 def _ns_to_score(ns: float, beverage: bool = False) -> float:
-    """Interpola il Nutri-Score nelle fasce A-E e restituisce 0-100."""
+    """Interpolates the Nutri-Score inside the A-E bands and returns 0-100."""
     bands = BEVERAGE_NS_BANDS if beverage else SOLID_NS_BANDS
     previous_ns, previous_score = bands[0][0], bands[0][1]
     for limit, score_at_limit, _ in bands[1:]:

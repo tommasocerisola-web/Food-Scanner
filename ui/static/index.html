@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Food Scanner · v0.3 beta</title>
-  <meta name="description" content="Food Scanner: leggi un prodotto da Open Food Facts e scopri perché prende quel punteggio.">
+  <meta name="description" content="Food Scanner: read a product from Open Food Facts and see why it gets that score.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%234ade80'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%230b100e'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -17,7 +17,7 @@
     </div>
     <div class="topbar-actions">
       <div class="version" id="engine-version">engine …</div>
-      <button type="button" id="contribute-button" class="contribute-button">+ Aggiungi foto</button>
+      <button type="button" id="contribute-button" class="contribute-button">+ Add photo</button>
     </div>
   </header>
 
@@ -25,12 +25,12 @@
     <section class="hero">
       <div class="hero-layout">
         <div class="hero-copy">
-          <p class="kicker">Dati reali · spiegazioni chiare · niente fuffa</p>
-          <h1>Il punteggio è solo l’inizio. <em>Guarda cosa c’è dietro.</em></h1>
+          <p class="kicker">Real data · clear explanations · no fluff</p>
+          <h1>The score is only the start. <em>Look at what is behind it.</em></h1>
           <p class="lede">
-            Scansiona un barcode da Open Food Facts oppure usa la demo offline.
-            Food Scanner ti mostra nutrienti, additivi e lavorazione che hanno
-            prodotto quel risultato, non un numero calato dall’alto.
+            Scan a barcode from Open Food Facts or use the offline demo.
+            Food Scanner shows the nutrients, additives and processing that
+            produced that result, not a number out of nowhere.
           </p>
 
           <form id="scan-form" class="scan-form" autocomplete="off">
@@ -46,54 +46,54 @@
                 placeholder="3017620422003"
                 aria-describedby="barcode-hint"
               >
-              <button type="submit" id="scan-button">Analizza</button>
+              <button type="submit" id="scan-button">Analyze</button>
             </div>
             <div class="scan-actions">
-              <button type="button" id="demo-button" class="secondary">Demo offline</button>
+              <button type="button" id="demo-button" class="secondary">Offline demo</button>
               <button type="button" id="camera-button" class="secondary camera-button">
                 <span class="camera-icon" aria-hidden="true">⌁</span>
-                Scansiona con fotocamera
+                Scan with camera
               </button>
               <input type="file" id="camera-file" accept="image/*" capture="environment" hidden>
             </div>
           </form>
           <p class="hint" id="barcode-hint">
-            Prova:
+            Try:
             <button type="button" class="link" data-barcode="3017620422003">Nutella</button> ·
             <button type="button" class="link" data-barcode="5449000000996">Coca-Cola</button> ·
-            <button type="button" class="link" data-barcode="8076800195057">Pasta Barilla</button>
+            <button type="button" class="link" data-barcode="8076800195057">Barilla pasta</button>
           </p>
         </div>
 
-        <aside class="hero-aside" aria-label="Come funziona Food Scanner">
+        <aside class="hero-aside" aria-label="How Food Scanner works">
           <div class="aside-head">
-            <span class="eyebrow">In tre passaggi</span>
+            <span class="eyebrow">In three steps</span>
             <span class="live-badge"><span class="live-dot" aria-hidden="true"></span>live</span>
           </div>
           <ol class="how-list">
             <li>
               <span class="step-number">01</span>
-              <div><strong>Scansiona</strong><span>Digita il barcode o inquadra la confezione.</span></div>
+              <div><strong>Scan</strong><span>Type the barcode or point at the package.</span></div>
             </li>
             <li>
               <span class="step-number">02</span>
-              <div><strong>Leggi</strong><span>Vedi score, componenti e motivazioni.</span></div>
+              <div><strong>Read</strong><span>See the score, components and reasons.</span></div>
             </li>
             <li>
               <span class="step-number">03</span>
-              <div><strong>Confronta</strong><span>Capisci cosa pesa davvero, non solo il totale.</span></div>
+              <div><strong>Compare</strong><span>Understand what really weighs, not just the total.</span></div>
             </li>
           </ol>
           <div class="scale-block">
-            <div class="scale-head"><span class="eyebrow">Scala del punteggio</span><span>0–100</span></div>
-            <div class="score-scale" aria-label="Legenda del punteggio">
-              <span class="scale-item scale-great"><i></i>75–100 <b>Eccellente</b></span>
-              <span class="scale-item scale-good"><i></i>50–74 <b>Buono</b></span>
-              <span class="scale-item scale-warn"><i></i>25–49 <b>Scarso</b></span>
-              <span class="scale-item scale-bad"><i></i>0–24 <b>Pessimo</b></span>
+            <div class="scale-head"><span class="eyebrow">Score scale</span><span>0–100</span></div>
+            <div class="score-scale" aria-label="Score legend">
+              <span class="scale-item scale-great"><i></i>75–100 <b>Excellent</b></span>
+              <span class="scale-item scale-good"><i></i>50–74 <b>Good</b></span>
+              <span class="scale-item scale-warn"><i></i>25–49 <b>Poor</b></span>
+              <span class="scale-item scale-bad"><i></i>0–24 <b>Bad</b></span>
             </div>
           </div>
-          <p class="aside-note">Il risultato non è un consiglio medico: è una lettura trasparente dei dati disponibili.</p>
+          <p class="aside-note">The result is not medical advice: it is a transparent reading of the available data.</p>
         </aside>
       </div>
     </section>
@@ -102,9 +102,9 @@
 
     <section id="result" class="result hidden" aria-live="polite">
       <div class="product-head">
-        <img id="product-image" class="product-image hidden" alt="Foto del prodotto">
+        <img id="product-image" class="product-image hidden" alt="Product photo">
         <div class="product-copy">
-          <p class="eyebrow" id="product-kind">Prodotto</p>
+          <p class="eyebrow" id="product-kind">Product</p>
           <h2 id="product-name">—</h2>
           <p class="meta">
             <span id="product-brand"></span>
@@ -124,76 +124,76 @@
       </div>
 
       <div class="confidence-row">
-        <div><span>Confidenza</span><strong id="confidence">—</strong></div>
-        <div><span>Copertura additivi</span><strong id="additive-coverage">—</strong></div>
-        <div><span>Versione motore</span><strong id="result-version">—</strong></div>
+        <div><span>Confidence</span><strong id="confidence">—</strong></div>
+        <div><span>Additive coverage</span><strong id="additive-coverage">—</strong></div>
+        <div><span>Engine version</span><strong id="result-version">—</strong></div>
       </div>
 
       <div id="data-warning" class="data-warning hidden">
         <div>
-          <strong>Dati incompleti</strong>
+          <strong>Incomplete data</strong>
           <p id="data-warning-text"></p>
         </div>
-        <button type="button" id="data-warning-button" class="secondary">Aggiungi foto</button>
+        <button type="button" id="data-warning-button" class="secondary">Add photo</button>
       </div>
 
       <div class="grid">
         <section class="panel">
-          <h3>Componenti</h3>
+          <h3>Components</h3>
           <div id="components" class="components"></div>
         </section>
         <section class="panel">
-          <h3>Allerte</h3>
+          <h3>Alerts</h3>
           <ul id="alerts" class="alerts"></ul>
         </section>
       </div>
 
       <section class="panel">
-        <h3>Perché</h3>
+        <h3>Why</h3>
         <ul id="reasons" class="reasons"></ul>
       </section>
 
       <section class="panel">
-        <h3>Additivi <span id="additives-count" class="count"></span></h3>
+        <h3>Additives <span id="additives-count" class="count"></span></h3>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>E</th>
-                <th>Nome</th>
-                <th>Rischio</th>
+                <th>Name</th>
+                <th>Risk</th>
                 <th>Dose</th>
-                <th>Perché</th>
+                <th>Why</th>
               </tr>
             </thead>
             <tbody id="additives-body"></tbody>
           </table>
         </div>
-        <p id="no-additives" class="empty hidden">Nessun additivo dichiarato.</p>
+        <p id="no-additives" class="empty hidden">No declared additives.</p>
       </section>
 
       <div class="grid">
         <section class="panel">
-          <h3>Nutrienti <small>per 100 g/ml</small></h3>
+          <h3>Nutrients <small>per 100 g/ml</small></h3>
           <dl id="nutrients" class="nutrients"></dl>
         </section>
         <section class="panel">
-          <h3>Ingredienti</h3>
+          <h3>Ingredients</h3>
           <p id="ingredients" class="ingredients">—</p>
         </section>
       </div>
     </section>
 
     <details class="panel manual">
-      <summary>Valuta un JSON Open Food Facts</summary>
+      <summary>Score an Open Food Facts JSON</summary>
       <p>
-        Incolla un prodotto già scaricato (o un oggetto con <code>product</code>).
-        Utile per testare lo scoring senza rete.
+        Paste a product you already downloaded (or an object with <code>product</code>).
+        Useful for testing the scoring without the network.
       </p>
-      <textarea id="json-input" spellcheck="false" placeholder='{"code": "12345678", "product_name": "Prodotto", "nutriments": {"energy-kcal_100g": 250}}'></textarea>
+      <textarea id="json-input" spellcheck="false" placeholder='{"code": "12345678", "product_name": "Product", "nutriments": {"energy-kcal_100g": 250}}'></textarea>
       <div class="manual-actions">
-        <button type="button" id="json-button">Valuta JSON</button>
-        <button type="button" id="json-demo" class="secondary">Carica demo</button>
+        <button type="button" id="json-button">Score JSON</button>
+        <button type="button" id="json-demo" class="secondary">Load demo</button>
       </div>
     </details>
   </main>
@@ -202,52 +202,52 @@
     <div class="dialog-head">
       <div>
         <p class="eyebrow">Open Food Facts</p>
-        <h2>Aiuta a completare il prodotto</h2>
+        <h2>Help complete the product</h2>
       </div>
-      <button type="button" id="contribute-close" class="icon-button" aria-label="Chiudi">×</button>
+      <button type="button" id="contribute-close" class="icon-button" aria-label="Close">×</button>
     </div>
 
     <p class="dialog-lede">
-      Scatta o scegli la foto generale del prodotto e quella della tabella nutrizionale.
-      Servono almeno 640×160 px; le foto vengono inviate a Open Food Facts con l'account
-      configurato sul server.
+      Take or choose the general product photo and the nutrition table photo.
+      They must be at least 640×160 px; the photos are sent to Open Food Facts with the
+      account configured on the server.
     </p>
 
     <div class="contribute-fields">
       <label for="contribute-barcode">Barcode
         <input id="contribute-barcode" type="text" inputmode="numeric" maxlength="14" placeholder="3017620422003">
       </label>
-      <button type="button" id="scan-barcode-button" class="secondary">Scansiona barcode/QR</button>
+      <button type="button" id="scan-barcode-button" class="secondary">Scan barcode/QR</button>
       <input type="file" id="scan-barcode-file" accept="image/*" capture="environment" hidden>
     </div>
 
     <div class="photo-grid">
       <label class="photo-slot" for="front-file">
-        <span class="photo-label">Foto generale</span>
+        <span class="photo-label">Product photo</span>
         <input type="file" id="front-file" accept="image/*" capture="environment" hidden>
-        <img id="front-preview" class="photo-preview hidden" alt="Anteprima foto prodotto">
-        <span id="front-placeholder" class="photo-placeholder">Scatta o scegli una foto</span>
+        <img id="front-preview" class="photo-preview hidden" alt="Product photo preview">
+        <span id="front-placeholder" class="photo-placeholder">Take or choose a photo</span>
       </label>
       <label class="photo-slot" for="nutrition-file">
-        <span class="photo-label">Tabella nutrizionale</span>
+        <span class="photo-label">Nutrition table</span>
         <input type="file" id="nutrition-file" accept="image/*" capture="environment" hidden>
-        <img id="nutrition-preview" class="photo-preview hidden" alt="Anteprima tabella nutrizionale">
-        <span id="nutrition-placeholder" class="photo-placeholder">Scatta o scegli una foto</span>
+        <img id="nutrition-preview" class="photo-preview hidden" alt="Nutrition table preview">
+        <span id="nutrition-placeholder" class="photo-placeholder">Take or choose a photo</span>
       </label>
     </div>
 
-    <p id="off-credentials-note" class="dialog-note">Verifico la configurazione…</p>
+    <p id="off-credentials-note" class="dialog-note">Checking the configuration…</p>
     <p id="contribute-status" class="status hidden" role="status" aria-live="polite"></p>
 
     <div class="dialog-actions">
-      <button type="button" id="contribute-submit" disabled>Invia a Open Food Facts</button>
-      <a id="off-product-link" class="link" href="https://world.openfoodfacts.org/" target="_blank" rel="noopener">Apri la pagina OFF</a>
+      <button type="button" id="contribute-submit" disabled>Send to Open Food Facts</button>
+      <a id="off-product-link" class="link" href="https://world.openfoodfacts.org/" target="_blank" rel="noopener">Open the OFF page</a>
     </div>
   </dialog>
 
   <footer>
-    <span>Food Scanner · motore di scoring alimentare</span>
-    <span>v0.3 beta · UI di test, non un'app di produzione · solo standard library</span>
+    <span>Food Scanner · food scoring engine</span>
+    <span>v0.3 beta · test UI, not a production app · standard library only</span>
   </footer>
 
   <script src="/static/app.js"></script>

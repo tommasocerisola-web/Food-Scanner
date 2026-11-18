@@ -1,4 +1,4 @@
-# Nessuna dipendenza runtime: il motore usa solo la standard library
-# (urllib, sqlite3, csv, json). I test usano unittest, incluso in Python.
+# No runtime dependencies: the engine uses the standard library only
+# (urllib, sqlite3, csv, json). Tests use unittest, shipped with Python.
 #
 # Python 3.10+

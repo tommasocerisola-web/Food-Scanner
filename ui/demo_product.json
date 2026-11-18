@@ -1,7 +1,6 @@
 {
   "code": "3017620422003",
-  "product_name": "Crema alle nocciole (demo)",
-  "product_name_it": "Crema alle nocciole (demo)",
+  "product_name": "Hazelnut spread (demo)",
   "brands": "Demo Lab",
   "quantity": "350 g",
   "categories_tags": [
@@ -11,7 +10,7 @@
     "en:sweet-spreads"
   ],
   "labels_tags": [],
-  "ingredients_text_it": "Zucchero, olio di palma, nocciole 13%, cacao magro 7,4%, latte scremato in polvere 6,6%, siero di latte in polvere, emulsionanti: lecitina di soia (E322), mono- e digliceridi degli acidi grassi (E471), aromi.",
+  "ingredients_text": "Sugar, palm oil, hazelnuts 13%, fat-reduced cocoa 7.4%, skimmed milk powder 6.6%, whey powder, emulsifiers: soy lecithin (E322), mono- and diglycerides of fatty acids (E471), flavourings.",
   "additives_tags": ["en:e322", "en:e471"],
   "ingredients": [
     {"id": "en:e322", "percent_estimate": 0.5},

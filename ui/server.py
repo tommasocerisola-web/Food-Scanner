@@ -1,19 +1,19 @@
 """
-UI di test per il motore di scoring: server HTTP minimale, solo standard library.
+Test UI for the scoring engine: minimal HTTP server, standard library only.
 
-Uso:
+Usage:
     python ui/server.py
     python ui/server.py --host 0.0.0.0 --port 8000
 
-Endpoint:
-    GET  /                      pagina di test
-    GET  /api/health            versione motore e statistiche tabella
-    GET  /api/demo              prodotto demo offline (grezzo + score)
+Endpoints:
+    GET  /                      test page
+    GET  /api/health            engine version and table statistics
+    GET  /api/demo              offline demo product (raw + score)
     GET  /api/score?barcode=... Open Food Facts + scoring
-    POST /api/score             prodotto OFF-like in JSON + scoring
+    POST /api/score             OFF-like product as JSON + scoring
 
-Non e' un'app di produzione: serve a vedere cosa fa il motore su dati reali
-o di prova, senza dipendenze e senza build frontend.
+This is not a production app: it shows what the engine does with real or test
+data, with no dependencies and no frontend build.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
 if __package__ in (None, ""):
-    # Permette `python ui/server.py` oltre a `python -m ui.server`.
+    # Allows `python ui/server.py` as well as `python -m ui.server`.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from engine import (
@@ -61,11 +61,11 @@ BARCODE_MIN, BARCODE_MAX = 8, 14
 def validate_barcode(value: str) -> str:
     barcode = "".join(char for char in str(value) if char not in " \t\r\n-_")
     if not barcode:
-        raise ValueError("Inserisci un barcode.")
+        raise ValueError("Enter a barcode.")
     if not barcode.isdigit():
-        raise ValueError("Il barcode deve contenere solo cifre.")
+        raise ValueError("The barcode must contain digits only.")
     if not BARCODE_MIN <= len(barcode) <= BARCODE_MAX:
-        raise ValueError(f"Il barcode deve avere tra {BARCODE_MIN} e {BARCODE_MAX} cifre.")
+        raise ValueError(f"The barcode must be between {BARCODE_MIN} and {BARCODE_MAX} digits long.")
     return barcode
 
 
@@ -73,16 +73,16 @@ def load_demo() -> dict[str, Any]:
     payload = json.loads(DEMO_PATH.read_text(encoding="utf-8"))
     product = payload.get("product", payload) if isinstance(payload, dict) else payload
     if not isinstance(product, dict):
-        raise ValueError("Il file demo non contiene un prodotto JSON.")
+        raise ValueError("The demo file does not contain a JSON product.")
     return product
 
 
 def score_payload(raw: Any, engine: ScoreEngine) -> dict[str, Any]:
     if not isinstance(raw, dict):
-        raise ValueError("Il prodotto deve essere un oggetto JSON.")
+        raise ValueError("The product must be a JSON object.")
     product = raw.get("product", raw)
     if not isinstance(product, dict):
-        raise ValueError("Il campo 'product' deve essere un oggetto JSON.")
+        raise ValueError("The 'product' field must be a JSON object.")
     return engine.score(normalize_product(product)).to_dict()
 
 
@@ -111,7 +111,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
     def upload_photo(self, **kwargs: Any) -> dict[str, Any]:
         return off_upload_image(**kwargs)
 
-    # ----------------------------- risposte ----------------------------- #
+    # ----------------------------- responses ---------------------------- #
     def _send_json(self, status: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -128,7 +128,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
         try:
             body = path.read_bytes()
         except OSError:
-            self._error(HTTPStatus.NOT_FOUND, "File non trovato.")
+            self._error(HTTPStatus.NOT_FOUND, "File not found.")
             return
         content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         if content_type.startswith("text/") or content_type in {
@@ -144,7 +144,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     # ----------------------------- routing ------------------------------ #
-    def do_GET(self) -> None:  # noqa: N802 - API di BaseHTTPRequestHandler
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         parsed = urlparse(self.path)
         route = parsed.path
 
@@ -154,7 +154,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
         if route.startswith("/static/"):
             static = _static_file(route[len("/static/"):])
             if static is None:
-                self._error(HTTPStatus.NOT_FOUND, "File statico non trovato.")
+                self._error(HTTPStatus.NOT_FOUND, "Static file not found.")
             else:
                 self._serve_static(static)
             return
@@ -179,7 +179,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
                 raw = load_demo()
                 result = score_payload(raw, self.engine)
             except (OSError, ValueError) as error:
-                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Demo non disponibile: {error}")
+                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Demo unavailable: {error}")
                 return
             self._send_json(
                 HTTPStatus.OK,
@@ -195,12 +195,12 @@ class ScoreHandler(BaseHTTPRequestHandler):
                 return
             self._score_barcode(barcode)
             return
-        self._error(HTTPStatus.NOT_FOUND, "Endpoint non trovato.")
+        self._error(HTTPStatus.NOT_FOUND, "Endpoint not found.")
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         if parsed.path not in {"/api/score", "/api/contribute"}:
-            self._error(HTTPStatus.NOT_FOUND, "Endpoint non trovato.")
+            self._error(HTTPStatus.NOT_FOUND, "Endpoint not found.")
             return
         try:
             raw = self._read_json()
@@ -213,8 +213,8 @@ class ScoreHandler(BaseHTTPRequestHandler):
             except ValueError as error:
                 self._error(HTTPStatus.BAD_REQUEST, str(error))
                 return
-            except Exception as error:  # noqa: BLE001 - la UI deve mostrare l'errore, non cadere
-                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Errore nello scoring: {error}")
+            except Exception as error:  # noqa: BLE001 - the UI must show the error, not crash
+                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Scoring error: {error}")
                 return
             self._send_json(HTTPStatus.OK, {"ok": True, "source": "manual", "result": result})
             return
@@ -224,20 +224,20 @@ class ScoreHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
-            raise ValueError("Content-Length non valido.") from error
+            raise ValueError("Invalid Content-Length.") from error
         if length <= 0:
-            raise ValueError("Corpo JSON mancante.")
+            raise ValueError("Missing JSON body.")
         if length > MAX_BODY:
-            raise ValueError("Corpo troppo grande (max 12 MB).")
+            raise ValueError("Body too large (max 12 MB).")
         body = self.rfile.read(length)
         try:
             return json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError(f"JSON non valido: {error}") from error
+            raise ValueError(f"Invalid JSON: {error}") from error
 
     def _contribute(self, raw: Any) -> None:
         if not isinstance(raw, dict):
-            self._error(HTTPStatus.BAD_REQUEST, "Payload non valido.")
+            self._error(HTTPStatus.BAD_REQUEST, "Invalid payload.")
             return
         try:
             barcode = validate_barcode(raw.get("barcode", ""))
@@ -246,14 +246,14 @@ class ScoreHandler(BaseHTTPRequestHandler):
             return
         images = raw.get("images")
         if not isinstance(images, dict) or not images:
-            self._error(HTTPStatus.BAD_REQUEST, "Carica almeno una foto (front o nutrition).")
+            self._error(HTTPStatus.BAD_REQUEST, "Upload at least one photo (front or nutrition).")
             return
         allowed = {"front", "nutrition"}
         unknown = set(images) - allowed
         if unknown:
             self._error(
                 HTTPStatus.BAD_REQUEST,
-                f"Campo immagine non supportato: {', '.join(sorted(unknown))}.",
+                f"Unsupported image field: {', '.join(sorted(unknown))}.",
             )
             return
         credentials = self.credentials()
@@ -264,8 +264,8 @@ class ScoreHandler(BaseHTTPRequestHandler):
                     "ok": False,
                     "code": "off_credentials_missing",
                     "error": (
-                        "Caricamento non configurato: imposta OFF_USER_ID e OFF_PASSWORD "
-                        "nell'ambiente del server (non nel browser)."
+                        "Upload not configured: set OFF_USER_ID and OFF_PASSWORD "
+                        "in the server environment (not in the browser)."
                     ),
                 },
             )
@@ -274,17 +274,17 @@ class ScoreHandler(BaseHTTPRequestHandler):
         prepared: list[tuple[str, bytes, str]] = []
         for field, image in images.items():
             if not isinstance(image, dict):
-                self._error(HTTPStatus.BAD_REQUEST, f"Immagine '{field}' non valida.")
+                self._error(HTTPStatus.BAD_REQUEST, f"Image '{field}' is not valid.")
                 return
             data_b64 = image.get("data")
             if not isinstance(data_b64, str) or not data_b64:
-                self._error(HTTPStatus.BAD_REQUEST, f"Immagine '{field}' senza dati.")
+                self._error(HTTPStatus.BAD_REQUEST, f"Image '{field}' has no data.")
                 return
             try:
                 data = base64.b64decode(data_b64, validate=True)
                 content_type = validate_image(data, image.get("content_type"))
             except (binascii.Error, ValueError) as error:
-                self._error(HTTPStatus.BAD_REQUEST, f"Immagine '{field}': {error}")
+                self._error(HTTPStatus.BAD_REQUEST, f"Image '{field}': {error}")
                 return
             prepared.append((field, data, content_type))
 
@@ -304,8 +304,8 @@ class ScoreHandler(BaseHTTPRequestHandler):
                 )
             except OFFUploadError as error:
                 errors.append({"imagefield": field, "error": str(error)})
-            except Exception:  # noqa: BLE001 - nessun dettaglio sensibile in risposta
-                errors.append({"imagefield": field, "error": "Errore imprevisto durante l'upload."})
+            except Exception:  # noqa: BLE001 - no sensitive detail in the response
+                errors.append({"imagefield": field, "error": "Unexpected error during the upload."})
             else:
                 uploaded.append(
                     {
@@ -318,7 +318,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
         if errors and not uploaded:
             self._send_json(
                 HTTPStatus.BAD_GATEWAY,
-                {"ok": False, "uploaded": [], "errors": errors, "error": "Nessuna foto è stata caricata."},
+                {"ok": False, "uploaded": [], "errors": errors, "error": "No photo was uploaded."},
             )
             return
         if errors:
@@ -328,7 +328,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
                     "ok": False,
                     "uploaded": uploaded,
                     "errors": errors,
-                    "error": "Alcune foto non sono state caricate.",
+                    "error": "Some photos were not uploaded.",
                 },
             )
             return
@@ -337,7 +337,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
             {
                 "ok": True,
                 "uploaded": uploaded,
-                "message": "Foto inviate a Open Food Facts.",
+                "message": "Photos sent to Open Food Facts.",
             },
         )
 
@@ -349,11 +349,11 @@ class ScoreHandler(BaseHTTPRequestHandler):
             product = client.fetch(barcode)
         except OFFError as error:
             message = str(error)
-            not_found = "non trovat" in message.lower() or "non presente" in message.lower()
+            not_found = "not found" in message.lower() or "not present" in message.lower()
             self._error(HTTPStatus.NOT_FOUND if not_found else HTTPStatus.BAD_GATEWAY, message)
             return
         except Exception as error:  # noqa: BLE001
-            self._error(HTTPStatus.BAD_GATEWAY, f"Errore nel recupero del prodotto: {error}")
+            self._error(HTTPStatus.BAD_GATEWAY, f"Error while fetching the product: {error}")
             return
         finally:
             if client is not None:
@@ -361,7 +361,7 @@ class ScoreHandler(BaseHTTPRequestHandler):
         try:
             result = self.engine.score(product).to_dict()
         except Exception as error:  # noqa: BLE001
-            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Errore nello scoring: {error}")
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Scoring error: {error}")
             return
         self._send_json(
             HTTPStatus.OK,
@@ -399,11 +399,11 @@ def make_server(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="UI di test per generic_01 (solo standard library)."
+        description="Test UI for generic_01 (standard library only)."
     )
-    parser.add_argument("--host", default="127.0.0.1", help="Indirizzo di ascolto (default 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8000, help="Porta (default 8000)")
-    parser.add_argument("--table", type=Path, default=None, help="CSV additivi alternativo")
+    parser.add_argument("--host", default="127.0.0.1", help="Listen address (default 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8000, help="Port (default 8000)")
+    parser.add_argument("--table", type=Path, default=None, help="Alternative additive CSV")
     parser.add_argument("--base-url", default="https://world.openfoodfacts.org")
     parser.add_argument("--rpm", type=int, default=60)
     parser.add_argument("--retries", type=int, default=3)
@@ -424,14 +424,14 @@ def main(argv: list[str] | None = None) -> int:
     server = ThreadingHTTPServer((args.host, args.port), handler)
     stats = table.stats()
     print(
-        f"UI di test: http://{args.host}:{args.port}  ·  engine {ENGINE_VERSION}  ·  "
-        f"{stats.get('total', '?')} additivi",
+        f"Test UI: http://{args.host}:{args.port}  ·  engine {ENGINE_VERSION}  ·  "
+        f"{stats.get('total', '?')} additives",
         flush=True,
     )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nArresto UI.", file=sys.stderr)
+        print("\nStopping the UI.", file=sys.stderr)
     finally:
         server.server_close()
     return 0

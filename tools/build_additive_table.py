@@ -1,15 +1,15 @@
 """
-Genera la tabella degli additivi da Open Food Facts.
+Build the additive table from Open Food Facts.
 
-Scarica la tassonomia ufficiale degli additivi di Open Food Facts e produce:
+Downloads the official Open Food Facts additive taxonomy and produces:
 
-  data/additives.csv      -> TUTTI gli additivi (E-number, nome EN/IT, classi, rischio da compilare)
-  data/preservatives.csv  -> solo i conservanti (class "preservative")
+  data/additives.csv      -> ALL additives (E-number, EN/IT name, classes, risk to fill)
+  data/preservatives.csv  -> preservatives only (class "preservative")
 
-La colonna `risk_score` e' volutamente vuota: va compilata a mano (0 = innocuo,
-100 = tossicita' massima). Il motore di scoring legge questi file a runtime.
+The `risk_score` column is deliberately fillable by hand (0 = harmless,
+100 = maximum toxicity). The scoring engine reads these files at runtime.
 
-Uso:
+Usage:
     python tools/build_additive_table.py
     python tools/build_additive_table.py --input /tmp/additives.json   # offline
 """
@@ -54,12 +54,12 @@ _SUFFIX = re.compile(r"^(e\d+)([a-z]{1,3})$")
 # --------------------------------------------------------------------------- #
 def download(url: str = TAXONOMY_URL, timeout: int = 60) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (URL costante)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (constant URL)
         return json.load(resp)
 
 
 # --------------------------------------------------------------------------- #
-# Parsing della tassonomia
+# Taxonomy parsing
 # --------------------------------------------------------------------------- #
 def clean_class(raw: str) -> str:
     """'en:anti-caking-agent' -> 'anti caking agent'."""
@@ -68,7 +68,7 @@ def clean_class(raw: str) -> str:
 
 
 def parse_classes(entry: dict) -> list[str]:
-    """Estrae le classi funzionali (conservante, colorante, ...)."""
+    """Extract the functional classes (preservative, colour, ...)."""
     found: list[str] = []
 
     def push(block) -> None:
@@ -77,7 +77,7 @@ def parse_classes(entry: dict) -> list[str]:
                 if chunk.strip():
                     found.append(clean_class(chunk))
         elif isinstance(block, dict):
-            # {"en": "en:acidity-regulator, en:acid"} oppure {"it": "Conservante"}
+            # {"en": "en:acidity-regulator, en:acid"} or {"it": "Conservante"}
             for value in block.values():
                 push(value)
         elif isinstance(block, list):
@@ -96,7 +96,7 @@ def parse_classes(entry: dict) -> list[str]:
 
 
 def parse_e_number(key: str, entry: dict) -> str | None:
-    """Costruisce 'E322', 'E341iii' ... a partire da e_number o dalla chiave."""
+    """Build 'E322', 'E341iii' ... from e_number or from the key."""
     raw = (entry.get("e_number") or {}).get("en")
     if isinstance(raw, str) and raw.strip():
         token = raw.strip().split()[0]
@@ -120,7 +120,7 @@ def _name(entry: dict, lang: str) -> str:
 
 
 def in_preservative_family(e_number: str) -> bool:
-    """La famiglia E2xx e' per schema UE quella dei conservanti."""
+    """Under the EU scheme the E2xx family is the preservatives."""
     digits = re.sub(r"\D", "", e_number)[:3]
     return len(digits) == 3 and 200 <= int(digits) <= 299
 
@@ -138,26 +138,26 @@ def build_rows(taxonomy: dict) -> list[dict]:
         e_number = parse_e_number(key, entry)
         if not e_number:
             continue
-        # Le voci senza classe funzionale restano nella tabella: meglio un
-        # additivo con classe vuota che un additivo invisibile allo scoring.
+        # Entries without a functional class stay in the table: an additive with
+        # an empty class beats an additive invisible to the scoring.
         classes = parse_classes(entry)
-        # OFF non classifica tutti i E2xx: se la classe manca del tutto, la
-        # famiglia E2xx (conservanti per schema UE) e' l'unica informazione
-        # disponibile e la usiamo. Se invece una classe c'e', vince la tassonomia
-        # (es. E260 = regolatore di acidita', non conservante).
+        # OFF does not classify every E2xx: when the class is missing entirely,
+        # the E2xx family (preservatives under the EU scheme) is the only
+        # information available and we use it. When a class is there, the
+        # taxonomy wins (e.g. E260 = acidity regulator, not preservative).
         if not classes and in_preservative_family(e_number):
             classes = ["preservative"]
 
-        # Rischio e spiegazione: curati a mano quando l'additivo e' noto,
-        # altrimenti stimati dalla classe funzionale (basis = "classe").
+        # Risk and explanation: curated by hand when the additive is known,
+        # otherwise estimated from the functional class (basis = "class").
         curated = curated_entry(e_number)
         if curated is not None:
             risk, why = curated
-            basis = "curata"
+            basis = "curated"
         else:
             known = [DEFAULT_RISK_BY_CLASS[c] for c in classes if c in DEFAULT_RISK_BY_CLASS]
             risk = max(known) if known else FALLBACK_RISK
-            basis = "classe"
+            basis = "class"
             why = why_for_class(classes)
 
         rows.append(
@@ -175,9 +175,9 @@ def build_rows(taxonomy: dict) -> list[dict]:
             }
         )
 
-    # Dedup per e_number. La tassonomia ha voci "base" (en:e322) e varianti
-    # (en:e322i): deve vincere la voce base, altrimenti E322 finirebbe con il
-    # nome/le classi della variante.
+    # Dedup by e_number. The taxonomy has "base" entries (en:e322) and variants
+    # (en:e322i): the base entry must win, otherwise E322 would end up with the
+    # name/classes of the variant.
     def is_base(row: dict) -> bool:
         return row["key"].lower() == "en:" + row["e_number"].lower()
 
@@ -187,7 +187,7 @@ def build_rows(taxonomy: dict) -> list[dict]:
         existing = unique.get(slot)
         if existing is None or (is_base(row) and not is_base(existing)):
             if existing is not None:
-                # conserva le classi gia' raccolte dalla variante
+                # keep the classes already collected from the variant
                 merged_classes = [c for c in existing["classes"].split(";") if c]
                 for cls in row["classes"].split(";"):
                     if cls and cls not in merged_classes:
@@ -212,7 +212,7 @@ def build_rows(taxonomy: dict) -> list[dict]:
 
 
 def load_existing(path: Path) -> dict[str, dict]:
-    """Righe gia' compilate: i punteggi scritti a mano non vanno mai persi."""
+    """Rows already filled: hand-written scores must never be lost."""
     if not path.exists():
         return {}
     with path.open(newline="", encoding="utf-8") as handle:
@@ -248,14 +248,14 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Costruisce data/additives.csv da Open Food Facts")
-    parser.add_argument("--input", type=Path, default=None, help="JSON della tassonomia gia' scaricato")
-    parser.add_argument("--out", type=Path, default=Path("data"), help="Cartella di output")
+    parser = argparse.ArgumentParser(description="Build data/additives.csv from Open Food Facts")
+    parser.add_argument("--input", type=Path, default=None, help="Already downloaded taxonomy JSON")
+    parser.add_argument("--out", type=Path, default=Path("data"), help="Output folder")
     parser.add_argument("--url", default=TAXONOMY_URL)
     parser.add_argument(
         "--no-preserve",
         action="store_true",
-        help="Riscrive risk_score/why dalla curatela invece di conservare i valori esistenti",
+        help="Rewrite risk_score/why from the curation instead of keeping existing values",
     )
     args = parser.parse_args(argv)
 
@@ -263,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
         taxonomy = json.loads(args.input.read_text(encoding="utf-8"))
         origine = str(args.input)
     else:
-        print(f"Scarico tassonomia: {args.url}", file=sys.stderr)
+        print(f"Downloading taxonomy: {args.url}", file=sys.stderr)
         taxonomy = download(args.url)
         origine = args.url
 
@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_preserve:
         kept = preserve_edits(rows, load_existing(args.out / "additives.csv"))
         if kept:
-            print(f"Mantenuti {kept} punteggi gia' compilati", file=sys.stderr)
+            print(f"Kept {kept} already filled scores", file=sys.stderr)
     preservatives = [row for row in rows if row["is_preservative"] == "true"]
 
     write_csv(args.out / "additives.csv", rows)
@@ -285,15 +285,15 @@ def main(argv: list[str] | None = None) -> int:
         "additives": len(rows),
         "preservatives": len(preservatives),
         "unscored": sum(1 for row in rows if not row["risk_score"]),
-        "curated": sum(1 for row in rows if row["basis"] == "curata"),
-        "class_based": sum(1 for row in rows if row["basis"] == "classe"),
+        "curated": sum(1 for row in rows if row["basis"] == "curated"),
+        "class_based": sum(1 for row in rows if row["basis"] == "class"),
     }
     (args.out / "additives.meta.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
     print(
-        f"OK: {len(rows)} additivi ({len(preservatives)} conservanti) -> {args.out}/additives.csv",
+        f"OK: {len(rows)} additives ({len(preservatives)} preservatives) -> {args.out}/additives.csv",
         file=sys.stderr,
     )
     return 0

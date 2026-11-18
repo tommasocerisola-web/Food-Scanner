@@ -10,27 +10,27 @@ const state = {
 
 const SOURCE_LABELS = {
   openfoodfacts: "Open Food Facts",
-  demo: "Demo offline",
-  manual: "JSON manuale",
+  demo: "Offline demo",
+  manual: "Manual JSON",
 };
 
 const COMPONENT_LABELS = {
-  nutrition: "Nutrienti",
-  additives: "Additivi",
-  processing: "Lavorazione",
-  organic: "Biologico",
+  nutrition: "Nutrition",
+  additives: "Additives",
+  processing: "Processing",
+  organic: "Organic",
 };
 
 const NUTRIENTS = [
-  ["kcal", "Energia", "kcal"],
-  ["sugars", "Zuccheri", "g"],
-  ["saturated_fat", "Grassi saturi", "g"],
-  ["salt", "Sale", "g"],
-  ["fiber", "Fibre", "g"],
-  ["protein", "Proteine", "g"],
-  ["fat", "Grassi", "g"],
-  ["sodium", "Sodio", "g"],
-  ["fruits_veg_nuts", "Frutta/verdura", "%"],
+  ["kcal", "Energy", "kcal"],
+  ["sugars", "Sugars", "g"],
+  ["saturated_fat", "Saturated fat", "g"],
+  ["salt", "Salt", "g"],
+  ["fiber", "Fiber", "g"],
+  ["protein", "Protein", "g"],
+  ["fat", "Fat", "g"],
+  ["sodium", "Sodium", "g"],
+  ["fruits_veg_nuts", "Fruits/vegetables", "%"],
 ];
 
 function el(tag, className, text) {
@@ -42,7 +42,7 @@ function el(tag, className, text) {
 
 function fmt(value, digits = 1) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "n/d";
-  return Number(value).toLocaleString("it-IT", { maximumFractionDigits: digits });
+  return Number(value).toLocaleString("en-US", { maximumFractionDigits: digits });
 }
 
 function pct(value) {
@@ -59,15 +59,15 @@ function scoreColor(score) {
 
 function scoreProfile(score) {
   if (score >= 75) {
-    return { label: "Eccellente", tone: "great", text: "profilo nutrizionale favorevole e pochi punti critici." };
+    return { label: "Excellent", tone: "great", text: "favourable nutritional profile with few critical points." };
   }
   if (score >= 50) {
-    return { label: "Buono", tone: "good", text: "profilo equilibrato, con qualche aspetto da tenere d'occhio." };
+    return { label: "Good", tone: "good", text: "balanced profile, with a few things to keep an eye on." };
   }
   if (score >= 25) {
-    return { label: "Scarso", tone: "warn", text: "diversi fattori pesano sul risultato: leggi le componenti e le allerte." };
+    return { label: "Poor", tone: "warn", text: "several factors weigh on the result: read the components and the alerts." };
   }
-  return { label: "Pessimo", tone: "bad", text: "il prodotto accumula criticità importanti: controlla additivi, nutrienti e lavorazione." };
+  return { label: "Bad", tone: "bad", text: "the product piles up important issues: check additives, nutrients and processing." };
 }
 
 function riskClass(risk) {
@@ -83,14 +83,14 @@ function setStatus(message, kind = "") {
   box.classList.toggle("hidden", !message);
 }
 
-function setLoading(loading, label = "Analisi…") {
+function setLoading(loading, label = "Analyzing…") {
   $("scan-button").disabled = loading;
   $("demo-button").disabled = loading;
   $("camera-button").disabled = loading;
   $("json-button").disabled = loading;
   $("json-demo").disabled = loading;
   $("contribute-submit").disabled = loading || !state.contributeConfigured;
-  $("scan-button").textContent = loading ? label : "Analizza";
+  $("scan-button").textContent = loading ? label : "Analyze";
   document.body.classList.toggle("loading", loading);
 }
 
@@ -108,16 +108,16 @@ async function requestJSON(url, options = {}) {
       headers: { Accept: "application/json", ...(options.headers || {}) },
     });
   } catch (error) {
-    throw new Error("Server non raggiungibile. Avvia `python ui/server.py` e ricarica.");
+    throw new Error("Server unreachable. Start `python ui/server.py` and reload.");
   }
   let payload;
   try {
     payload = await response.json();
   } catch (error) {
-    throw new Error(`Risposta non valida dal server (HTTP ${response.status}).`);
+    throw new Error(`Invalid response from the server (HTTP ${response.status}).`);
   }
   if (!response.ok || !payload.ok) {
-    const error = new Error(payload.error || `Errore HTTP ${response.status}.`);
+    const error = new Error(payload.error || `HTTP error ${response.status}.`);
     error.payload = payload;
     throw error;
   }
@@ -134,8 +134,8 @@ function renderBadges(product) {
   if (product.nova_group) {
     badges.append(el("span", `badge nova-${product.nova_group}`, `NOVA ${product.nova_group}`));
   }
-  if (product.organic) badges.append(el("span", "badge bio", "Biologico"));
-  badges.append(el("span", "badge ghost", product.is_beverage ? "Bevanda" : "Solido"));
+  if (product.organic) badges.append(el("span", "badge bio", "Organic"));
+  badges.append(el("span", "badge ghost", product.is_beverage ? "Beverage" : "Solid"));
 }
 
 function renderComponents(components) {
@@ -163,15 +163,15 @@ function renderComponents(components) {
     item.append(bar);
 
     const details = component.details || {};
-    let note = `peso ${Math.round(Number(component.weight || 0) * 100)}%`;
+    let note = `weight ${Math.round(Number(component.weight || 0) * 100)}%`;
     if (component.name === "nutrition" && details.nutri_score !== undefined && details.nutri_score !== null) {
       note += ` · Nutri-Score ${fmt(details.nutri_score, 0)}`;
     } else if (component.name === "additives") {
-      note += ` · ${details.count || 0} additivi · peggiore ${details.worst_additive || "—"}`;
+      note += ` · ${details.count || 0} additives · worst ${details.worst_additive || "—"}`;
     } else if (component.name === "processing") {
-      note += details.nova_group ? ` · NOVA ${details.nova_group}` : " · NOVA non dichiarato";
+      note += details.nova_group ? ` · NOVA ${details.nova_group}` : " · NOVA not declared";
     } else if (component.name === "organic") {
-      note += details.organic ? " · certificato" : " · non dichiarato";
+      note += details.organic ? " · certified" : " · not declared";
     }
     item.append(el("small", "component-note", note));
     container.append(item);
@@ -182,7 +182,7 @@ function renderAlerts(alerts) {
   const list = $("alerts");
   list.replaceChildren();
   if (!alerts || !alerts.length) {
-    list.append(el("li", "empty", "Nessuna allerta."));
+    list.append(el("li", "empty", "No alerts."));
     return;
   }
   for (const alert of alerts) {
@@ -197,7 +197,7 @@ function renderReasons(reasons) {
   const list = $("reasons");
   list.replaceChildren();
   if (!reasons || !reasons.length) {
-    list.append(el("li", "empty", "Nessuna spiegazione disponibile."));
+    list.append(el("li", "empty", "No explanation available."));
     return;
   }
   for (const reason of reasons) list.append(el("li", "", reason));
@@ -217,7 +217,7 @@ function renderAdditives(additives) {
     if (additive.classes && additive.classes.length) {
       nameCell.append(el("small", "classes", additive.classes.join(" · ")));
     }
-    if (additive.risk_estimated) nameCell.append(el("span", "estimate", "stima"));
+    if (additive.risk_estimated) nameCell.append(el("span", "estimate", "estimate"));
     row.append(nameCell);
 
     const riskCell = el("td");
@@ -254,10 +254,10 @@ function renderResult(payload) {
   const result = payload.result;
   const product = result.product || {};
 
-  $("product-kind").textContent = SOURCE_LABELS[payload.source] || "Prodotto";
-  $("product-name").textContent = product.name || "(senza nome)";
-  $("product-brand").textContent = product.brand || "Marca non dichiarata";
-  $("product-barcode").textContent = product.barcode ? `EAN ${product.barcode}` : "Barcode n/d";
+  $("product-kind").textContent = SOURCE_LABELS[payload.source] || "Product";
+  $("product-name").textContent = product.name || "(unnamed)";
+  $("product-brand").textContent = product.brand || "Brand not declared";
+  $("product-barcode").textContent = product.barcode ? `EAN ${product.barcode}` : "Barcode n/a";
   $("product-quantity").textContent = product.quantity || "";
   renderBadges(product);
   state.current = payload;
@@ -295,22 +295,22 @@ function renderResult(payload) {
   renderReasons(result.reasons || []);
   renderAdditives(result.additives || []);
   renderNutrients(product.nutriments || {});
-  $("ingredients").textContent = product.ingredients_text || "Non dichiarati in Open Food Facts.";
+  $("ingredients").textContent = product.ingredients_text || "Not declared in Open Food Facts.";
 
   const missing = [];
   if (payload.source === "openfoodfacts") {
-    if (!product.image_url) missing.push("foto del prodotto");
-    if (!product.image_nutrition_url) missing.push("tabella nutrizionale");
+    if (!product.image_url) missing.push("product photo");
+    if (!product.image_nutrition_url) missing.push("nutrition table");
     const nutrients = product.nutriments || {};
     if ([nutrients.kcal, nutrients.sugars, nutrients.saturated_fat, nutrients.salt].some(
       (value) => value === null || value === undefined,
     )) {
-      missing.push("nutrienti");
+      missing.push("nutrients");
     }
   }
   const warning = $("data-warning");
   if (missing.length) {
-    $("data-warning-text").textContent = `Mancano: ${missing.join(", ")}. Aggiungi una foto per contribuire a Open Food Facts.`;
+    $("data-warning-text").textContent = `Missing: ${missing.join(", ")}. Add a photo to contribute to Open Food Facts.`;
     warning.classList.remove("hidden");
   } else {
     warning.classList.add("hidden");
@@ -333,7 +333,7 @@ function openContribute(barcode) {
   if (state.contributeConfigured) {
     setContributeStatus("", "");
   } else {
-    setContributeStatus("Credenziali OFF non configurate sul server: imposta OFF_USER_ID e OFF_PASSWORD.", "error");
+    setContributeStatus("OFF credentials not configured on the server: set OFF_USER_ID and OFF_PASSWORD.", "error");
   }
   const dialog = $("contribute-dialog");
   if (typeof dialog.showModal === "function") dialog.showModal();
@@ -352,20 +352,20 @@ function loadBitmap(file) {
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Immagine non valida.")); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Invalid image.")); };
     image.src = url;
   });
 }
 
 async function prepareImage(file) {
-  if (!file.type.startsWith("image/")) throw new Error("Il file non è un'immagine.");
+  if (!file.type.startsWith("image/")) throw new Error("The file is not an image.");
   const source = await loadBitmap(file);
   const maxSide = 1800;
   const scale = Math.min(1, maxSide / Math.max(source.width, source.height));
   const width = Math.round(source.width * scale);
   const height = Math.round(source.height * scale);
   if (width < 640 || height < 160) {
-    throw new Error("Foto troppo piccola: servono almeno 640×160 px.");
+    throw new Error("Photo too small: at least 640×160 px are required.");
   }
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -397,7 +397,7 @@ function bindPhotoSlot(kind, inputId, previewId, placeholderId) {
       $(placeholderId).classList.add("hidden");
       input.closest(".photo-slot").classList.add("has-image");
       setContributeStatus(
-        `${kind === "front" ? "Foto prodotto" : "Tabella nutrizionale"} pronta (${prepared.width}×${prepared.height}).`,
+        `${kind === "front" ? "Product photo" : "Nutrition table"} ready (${prepared.width}×${prepared.height}).`,
         "ok",
       );
     } catch (error) {
@@ -408,9 +408,9 @@ function bindPhotoSlot(kind, inputId, previewId, placeholderId) {
 }
 
 async function detectBarcode(file) {
-  if (!file) throw new Error("Nessuna immagine selezionata.");
+  if (!file) throw new Error("No image selected.");
   if (!("BarcodeDetector" in window)) {
-    throw new Error("Questo browser non supporta la scansione automatica: inserisci il barcode a mano.");
+    throw new Error("This browser does not support automatic scanning: enter the barcode by hand.");
   }
   const formats = ["ean_13", "ean_8", "upc_a", "upc_e", "qr_code"];
   let supported = formats;
@@ -418,13 +418,13 @@ async function detectBarcode(file) {
     const available = await BarcodeDetector.getSupportedFormats();
     supported = formats.filter((format) => available.includes(format));
   }
-  if (!supported.length) throw new Error("Nessun formato barcode supportato da questo browser.");
+  if (!supported.length) throw new Error("No barcode format supported by this browser.");
   const detector = new BarcodeDetector({ formats: supported });
   const bitmap = await loadBitmap(file);
   const codes = await detector.detect(bitmap);
-  if (!codes.length) throw new Error("Nessun barcode/QR riconosciuto. Riprova più vicino e con buona luce.");
+  if (!codes.length) throw new Error("No barcode/QR recognized. Try again closer and with good light.");
   const barcode = String(codes[0].rawValue || "").replace(/\D/g, "");
-  if (!/^\d{8,14}$/.test(barcode)) throw new Error("Il codice letto non sembra un barcode prodotto.");
+  if (!/^\d{8,14}$/.test(barcode)) throw new Error("The scanned code does not look like a product barcode.");
   return barcode;
 }
 
@@ -433,28 +433,28 @@ async function handleScanPhoto(file) {
   try {
     const barcode = await detectBarcode(file);
     $("contribute-barcode").value = barcode;
-    setContributeStatus(`Barcode letto: ${barcode}`, "ok");
+    setContributeStatus(`Barcode read: ${barcode}`, "ok");
   } catch (error) {
-    setContributeStatus(error.message || "Scansione non riuscita.", "error");
+    setContributeStatus(error.message || "Scan failed.", "error");
   }
 }
 
 async function handleProductScan(file) {
   if (!file) return;
-  setStatus("Leggo il barcode dalla foto…", "info");
+  setStatus("Reading the barcode from the photo…", "info");
   try {
     const barcode = await detectBarcode(file);
     $("barcode").value = barcode;
     await scanBarcode(barcode);
   } catch (error) {
-    setStatus(error.message || "Scansione non riuscita.", "error");
+    setStatus(error.message || "Scan failed.", "error");
   }
 }
 
 async function submitContribution() {
   const barcode = $("contribute-barcode").value.replace(/\D/g, "");
   if (!/^\d{8,14}$/.test(barcode)) {
-    setContributeStatus("Inserisci un barcode di 8-14 cifre.", "error");
+    setContributeStatus("Enter a barcode of 8-14 digits.", "error");
     return;
   }
   const images = {};
@@ -464,28 +464,28 @@ async function submitContribution() {
     }
   }
   if (!Object.keys(images).length) {
-    setContributeStatus("Aggiungi almeno una foto.", "error");
+    setContributeStatus("Add at least one photo.", "error");
     return;
   }
   if (!state.contributeConfigured) {
-    setContributeStatus("Credenziali OFF non configurate sul server.", "error");
+    setContributeStatus("OFF credentials not configured on the server.", "error");
     return;
   }
-  setLoading(true, "Invio…");
-  setContributeStatus("Invio le foto a Open Food Facts…", "info");
+  setLoading(true, "Sending…");
+  setContributeStatus("Sending the photos to Open Food Facts…", "info");
   try {
     const payload = await requestJSON("/api/contribute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ barcode, images }),
     });
-    setContributeStatus(payload.message || "Foto inviate a Open Food Facts.", "ok");
+    setContributeStatus(payload.message || "Photos sent to Open Food Facts.", "ok");
     $("data-warning").classList.add("hidden");
   } catch (error) {
     const partial = error.payload && error.payload.uploaded && error.payload.uploaded.length;
     if (partial) {
       setContributeStatus(
-        `${error.payload.error} Caricate: ${error.payload.uploaded.map((item) => item.imagefield).join(", ")}.`,
+        `${error.payload.error} Uploaded: ${error.payload.uploaded.map((item) => item.imagefield).join(", ")}.`,
         "error",
       );
     } else {
@@ -499,15 +499,15 @@ async function submitContribution() {
 async function scanBarcode(value) {
   const barcode = String(value || "").replace(/[\s-]/g, "");
   if (!/^\d{8,14}$/.test(barcode)) {
-    showError(new Error("Il barcode deve avere tra 8 e 14 cifre."));
+    showError(new Error("The barcode must be between 8 and 14 digits."));
     return;
   }
-  setLoading(true, "Scarico…");
-  setStatus("Interrogo Open Food Facts…", "info");
+  setLoading(true, "Downloading…");
+  setStatus("Querying Open Food Facts…", "info");
   try {
     const payload = await requestJSON(`/api/score?barcode=${encodeURIComponent(barcode)}`);
     renderResult(payload);
-    setStatus(`Analizzato su Open Food Facts · ${new Date().toLocaleTimeString("it-IT")}`, "ok");
+    setStatus(`Analyzed on Open Food Facts · ${new Date().toLocaleTimeString("en-US")}`, "ok");
   } catch (error) {
     showError(error);
   } finally {
@@ -517,11 +517,11 @@ async function scanBarcode(value) {
 
 async function runDemo() {
   setLoading(true, "Demo…");
-  setStatus("Calcolo il prodotto demo offline…", "info");
+  setStatus("Scoring the offline demo product…", "info");
   try {
     const payload = await requestJSON("/api/demo");
     renderResult(payload);
-    setStatus("Demo offline · nessuna rete", "ok");
+    setStatus("Offline demo · no network", "ok");
   } catch (error) {
     showError(error);
   } finally {
@@ -532,18 +532,18 @@ async function runDemo() {
 async function runManual() {
   const text = $("json-input").value.trim();
   if (!text) {
-    showError(new Error("Incolla un JSON o premi «Carica demo»."));
+    showError(new Error("Paste a JSON or press «Load demo»."));
     return;
   }
   let raw;
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    showError(new Error(`JSON non valido: ${error.message}`));
+    showError(new Error(`Invalid JSON: ${error.message}`));
     return;
   }
-  setLoading(true, "Calcolo…");
-  setStatus("Valuto il JSON manuale…", "info");
+  setLoading(true, "Scoring…");
+  setStatus("Scoring the manual JSON…", "info");
   try {
     const payload = await requestJSON("/api/score", {
       method: "POST",
@@ -551,7 +551,7 @@ async function runManual() {
       body: JSON.stringify(raw),
     });
     renderResult(payload);
-    setStatus("JSON manuale valutato", "ok");
+    setStatus("Manual JSON scored", "ok");
   } catch (error) {
     showError(error);
   } finally {
@@ -563,7 +563,7 @@ async function loadDemoJson() {
   try {
     const payload = await requestJSON("/api/demo");
     $("json-input").value = JSON.stringify(payload.product, null, 2);
-    setStatus("JSON demo caricato: premi «Valuta JSON».", "ok");
+    setStatus("Demo JSON loaded: press «Score JSON».", "ok");
   } catch (error) {
     showError(error);
   }
@@ -611,18 +611,18 @@ document.addEventListener("DOMContentLoaded", () => {
   requestJSON("/api/health")
     .then((health) => {
       const total = health.additives && health.additives.total;
-      $("engine-version").textContent = `engine ${health.engine_version}${total ? ` · ${total} additivi` : ""}`;
+      $("engine-version").textContent = `engine ${health.engine_version}${total ? ` · ${total} additives` : ""}`;
       const configured = Boolean(health.contribute && health.contribute.configured);
       state.contributeConfigured = configured;
       $("off-credentials-note").textContent = configured
-        ? "Account Open Food Facts configurato sul server."
-        : "Per inviare le foto imposta OFF_USER_ID e OFF_PASSWORD nell'ambiente del server (non nel browser).";
+        ? "Open Food Facts account configured on the server."
+        : "To send photos, set OFF_USER_ID and OFF_PASSWORD in the server environment (not in the browser).";
       $("off-credentials-note").classList.toggle("warn", !configured);
       $("contribute-submit").disabled = !configured;
     })
     .catch(() => {
       $("engine-version").textContent = "engine offline";
-      $("off-credentials-note").textContent = "Server non raggiungibile: impossibile verificare le credenziali OFF.";
+      $("off-credentials-note").textContent = "Server unreachable: cannot check the OFF credentials.";
     });
 
   const params = new URLSearchParams(window.location.search);

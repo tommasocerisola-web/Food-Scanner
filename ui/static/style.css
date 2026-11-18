@@ -777,7 +777,7 @@ a.link { color: var(--green); font-weight: 700; text-underline-offset: 3px; }
 }
 
 /* -------------------------------------------------------------------------- */
-/* v0.3 — Food Scanner: hero a due colonne, legenda e riepilogo del punteggio  */
+/* v0.3 — Food Scanner: two-column hero, legend and score summary            */
 /* -------------------------------------------------------------------------- */
 
 .brand-name {

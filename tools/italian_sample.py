@@ -1,12 +1,12 @@
 """
-Collaudo live su prodotti italiani reali di Open Food Facts.
+Live check on real Italian products from Open Food Facts.
 
-Uso:
+Usage:
     python tools/italian_sample.py --limit 100
     python tools/italian_sample.py --limit 100 --seed 2026 --out out/italian_sample.json
 
-Non è un test unitario: scarica un campione casuale riproducibile di prodotti
-italiani, applica la normalizzazione e verifica le invarianti del motore.
+This is not a unit test: it downloads a reproducible random sample of Italian
+products, applies the normalization and checks the engine invariants.
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ from engine.models import grade_for  # noqa: E402
 from engine.scoring import ENGINE_VERSION  # noqa: E402
 
 SEARCH_URL = "https://world.openfoodfacts.org/api/v2/search"
-# OFF applica anti-bot agli User-Agent "applicativi" senza un contatto verificabile;
-# per la ricerca usiamo un UA browser-like, mantenendo il nome del progetto.
+# OFF applies anti-bot rules to "application" User-Agents without a verifiable
+# contact; for the search we use a browser-like UA, keeping the project name.
 SEARCH_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -98,7 +98,7 @@ def fetch_sample(
             if not isinstance(product, dict):
                 continue
             code = str(product.get("code") or "").strip()
-            name = str(product.get("product_name_it") or product.get("product_name") or "").strip()
+            name = str(product.get("product_name") or product.get("product_name_it") or "").strip()
             if not code or not name or code in seen:
                 continue
             seen.add(code)
@@ -116,24 +116,24 @@ def check_product(engine: ScoreEngine, raw: dict[str, Any]) -> tuple[dict[str, A
     problems: list[str] = []
 
     if not 0 <= result.score <= 100:
-        problems.append(f"score fuori range: {result.score}")
+        problems.append(f"score out of range: {result.score}")
     if result.grade != grade_for(result.score):
-        problems.append("grade incoerente con lo score")
+        problems.append("grade inconsistent with the score")
     if not 0.0 <= result.confidence <= 1.0:
-        problems.append(f"confidence fuori range: {result.confidence}")
+        problems.append(f"confidence out of range: {result.confidence}")
     if not 0.0 <= result.additive_coverage <= 1.0:
-        problems.append(f"copertura additivi fuori range: {result.additive_coverage}")
+        problems.append(f"additive coverage out of range: {result.additive_coverage}")
     if abs(sum(component.weight for component in result.components) - 1.0) > 1e-6:
-        problems.append("pesi delle componenti non sommano 1")
+        problems.append("component weights do not add up to 1")
     if result.engine_version != ENGINE_VERSION:
-        problems.append(f"versione motore inattesa: {result.engine_version}")
+        problems.append(f"unexpected engine version: {result.engine_version}")
     if any(
         component.score is not None and not 0 <= component.score <= 100
         for component in result.components
     ):
-        problems.append("componente fuori range")
+        problems.append("component out of range")
     if any(not 0 <= hit.risk <= 100 for hit in result.additives):
-        problems.append("rischio additivo fuori range")
+        problems.append("additive risk out of range")
 
     entry = {
         "barcode": record.barcode,
@@ -154,25 +154,25 @@ def check_product(engine: ScoreEngine, raw: dict[str, Any]) -> tuple[dict[str, A
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Collauda prodotti italiani reali da Open Food Facts.")
-    parser.add_argument("--limit", type=int, default=100, help="Numero di prodotti (default 100)")
-    parser.add_argument("--seed", type=int, default=2026, help="Seed per la scelta delle pagine")
-    parser.add_argument("--page-size", type=int, default=100, help="Prodotti per pagina OFF")
+    parser = argparse.ArgumentParser(description="Check real Italian products from Open Food Facts.")
+    parser.add_argument("--limit", type=int, default=100, help="Number of products (default 100)")
+    parser.add_argument("--seed", type=int, default=2026, help="Seed for the page selection")
+    parser.add_argument("--page-size", type=int, default=100, help="Products per OFF page")
     parser.add_argument("--out", type=Path, default=Path("out/italian_sample.json"))
     args = parser.parse_args(argv)
 
     if args.limit <= 0:
-        parser.error("--limit deve essere positivo")
+        parser.error("--limit must be positive")
 
     try:
         raw_products, pages = fetch_sample(args.limit, args.seed, args.page_size)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-        print(f"Open Food Facts non raggiungibile: {error}", file=sys.stderr)
+        print(f"Open Food Facts unreachable: {error}", file=sys.stderr)
         return 2
 
     if len(raw_products) < args.limit:
         print(
-            f"Trovati solo {len(raw_products)} prodotti con nome e barcode su {args.limit} richiesti.",
+            f"Only {len(raw_products)} products with a name and barcode found out of {args.limit} requested.",
             file=sys.stderr,
         )
         return 2
@@ -183,9 +183,9 @@ def main(argv: list[str] | None = None) -> int:
     failures: list[str] = []
 
     print("=" * 96)
-    print(f"COLLAUDO {args.limit} PRODOTTI ITALIANI · Open Food Facts · seed {args.seed}")
+    print(f"CHECK OF {args.limit} ITALIAN PRODUCTS · Open Food Facts · seed {args.seed}")
     print("=" * 96)
-    print(f"{'#':>3}  {'barcode':<14} {'score':>5} {'conf':>5} {'add':>4}  nome")
+    print(f"{'#':>3}  {'barcode':<14} {'score':>5} {'conf':>5} {'add':>4}  name")
     print("-" * 96)
 
     for index, raw in enumerate(raw_products[: args.limit], start=1):
@@ -224,17 +224,17 @@ def main(argv: list[str] | None = None) -> int:
     missing_nutrition = sum(entry["nutrition"] is None for entry in entries)
     print()
     print(
-        f"Prodotti: {len(entries)} · media {statistics.mean(scores):.0f} · "
-        f"min {min(scores)} · max {max(scores)} · senza nutrienti {missing_nutrition} · "
-        f"pagine OFF {', '.join(map(str, pages))}"
+        f"Products: {len(entries)} · mean {statistics.mean(scores):.0f} · "
+        f"min {min(scores)} · max {max(scores)} · without nutrients {missing_nutrition} · "
+        f"OFF pages {', '.join(map(str, pages))}"
     )
     if failures:
-        print(f"Problemi: {len(failures)}", file=sys.stderr)
+        print(f"Problems: {len(failures)}", file=sys.stderr)
         for failure in failures[:20]:
             print(f"  - {failure}", file=sys.stderr)
         return 1
 
-    print("Esito: OK · tutte le invarianti rispettate")
+    print("Result: OK · every invariant held")
     if args.out:
         print(f"Report: {args.out}")
     return 0

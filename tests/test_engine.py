@@ -1,4 +1,4 @@
-"""Test offline del motore (nessuna rete): unittest della standard library."""
+"""Offline engine tests (no network): standard library unittest."""
 from __future__ import annotations
 
 import csv
@@ -91,14 +91,14 @@ class NutritionScoreTests(unittest.TestCase):
 
 
 class AdditiveDominanceTests(unittest.TestCase):
-    """Il cuore del progetto: un singolo additivo tossico non deve essere diluito."""
+    """The core of the project: a single toxic additive must not be diluted."""
 
     def setUp(self) -> None:
         self.table = make_table(
             [
                 ("E330", "acidity regulator", "Acido citrico", "2"),
                 ("E300", "antioxidant", "Acido ascorbico", "3"),
-                ("E211", "preservative", "Benzoato di sodio", "92"),
+                ("E211", "preservative", "Sodium benzoate", "92"),
             ]
         )
         self.engine = ScoreEngine(self.table)
@@ -132,7 +132,7 @@ class AdditiveDominanceTests(unittest.TestCase):
         self.assertLess(toxic.score, clean.score - 20)
         self.assertLess(toxic.score, 70)
         self.assertEqual(toxic.worst_additive.e_number, "E211")
-        self.assertEqual(toxic.alerts[0].level, "critico")
+        self.assertEqual(toxic.alerts[0].level, "critical")
 
     def test_additive_component_values(self) -> None:
         result = self.engine.score(self._product(("en:e211",)))
@@ -202,7 +202,7 @@ class DataQualityTests(unittest.TestCase):
 
     def test_additive_coverage_is_reported(self) -> None:
         table = make_table(
-            [("E211", "preservative", "Benzoato di sodio", "35"), ("E330", "acidity regulator", "Citrico", "")]
+            [("E211", "preservative", "Sodium benzoate", "35"), ("E330", "acidity regulator", "Citric acid", "")]
         )
         engine = ScoreEngine(table)
         result = engine.score(
@@ -220,7 +220,7 @@ class DataQualityTests(unittest.TestCase):
 
 class ExplanationAndDoseTests(unittest.TestCase):
     def test_why_text_is_loaded_and_reported(self) -> None:
-        table = make_table([("E211", "preservative", "Benzoato di sodio", "35")])
+        table = make_table([("E211", "preservative", "Sodium benzoate", "35")])
         row = table.get("en:e211")
         self.assertEqual(row.basis, "curata")
         engine = ScoreEngine(table)
@@ -233,11 +233,11 @@ class ExplanationAndDoseTests(unittest.TestCase):
                 }
             )
         )
-        self.assertIn("benzoato", result.additives[0].name.lower())
+        self.assertIn("benzoate", result.additives[0].name.lower())
         self.assertEqual(result.additives[0].base_risk, 35)
 
     def test_dose_scales_risk(self) -> None:
-        table = make_table([("E211", "preservative", "Benzoato di sodio", "60")])
+        table = make_table([("E211", "preservative", "Sodium benzoate", "60")])
         engine = ScoreEngine(table)
         record = normalize_product(
             {
@@ -254,7 +254,7 @@ class ExplanationAndDoseTests(unittest.TestCase):
         self.assertLess(hit.risk, 20)
 
     def test_no_dose_keeps_full_risk(self) -> None:
-        table = make_table([("E211", "preservative", "Benzoato di sodio", "60")])
+        table = make_table([("E211", "preservative", "Sodium benzoate", "60")])
         engine = ScoreEngine(table)
         result = engine.score(
             normalize_product(
@@ -284,9 +284,9 @@ class ExplanationAndDoseTests(unittest.TestCase):
                 }
             )
         )
-        self.assertTrue(any("Zuccheri" in reason for reason in result.reasons))
+        self.assertTrue(any("Sugars" in reason for reason in result.reasons))
         self.assertTrue(any("NOVA 4" in reason for reason in result.reasons))
-        self.assertTrue(any("nessuno dichiarato" in reason for reason in result.reasons))
+        self.assertTrue(any("none declared" in reason for reason in result.reasons))
         self.assertEqual(len(result.to_dict()["reasons"]), len(result.reasons))
 
 
@@ -345,7 +345,7 @@ class TableTests(unittest.TestCase):
         from engine.additives import DEFAULT_TABLE_PATH
 
         if not DEFAULT_TABLE_PATH.exists():
-            self.skipTest("data/additives.csv non ancora generato")
+            self.skipTest("data/additives.csv not generated yet")
         table = AdditiveTable.load()
         self.assertGreater(len(table), 200)
 

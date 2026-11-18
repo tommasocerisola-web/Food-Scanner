@@ -1,9 +1,9 @@
 """
-Caricamento foto su Open Food Facts.
+Photo upload to Open Food Facts.
 
-Usa l'endpoint CGI documentato (`product_image_upload.pl`): e' ancora supportato
-e ha campi multipart espliciti. Le credenziali sono richieste da OFF per ogni
-scrittura e vanno passate dal server, mai dal browser.
+Uses the documented CGI endpoint (`product_image_upload.pl`): it is still
+supported and has explicit multipart fields. OFF requires credentials for every
+write, and they must be passed by the server, never by the browser.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _BARCODE_RE = re.compile(r"^\d{8,14}$")
 
 
 class OFFUploadError(Exception):
-    """Errore di caricamento foto su Open Food Facts."""
+    """Photo upload error on Open Food Facts."""
 
 
 def detect_image_type(data: bytes) -> str | None:
@@ -38,28 +38,28 @@ def detect_image_type(data: bytes) -> str | None:
 
 
 def validate_image(data: bytes, content_type: str | None = None) -> str:
-    """Valida bytes e ritorna il MIME rilevato dai magic bytes."""
+    """Validate the bytes and return the MIME type detected from the magic bytes."""
     if not isinstance(data, (bytes, bytearray)) or not data:
-        raise ValueError("Immagine vuota.")
+        raise ValueError("Empty image.")
     if len(data) > MAX_IMAGE_BYTES:
-        raise ValueError("Immagine troppo grande (max 5 MB).")
+        raise ValueError("Image too large (max 5 MB).")
     detected = detect_image_type(bytes(data))
     if detected is None:
-        raise ValueError("Formato immagine non supportato (usa JPEG, PNG o WebP).")
+        raise ValueError("Unsupported image format (use JPEG, PNG or WebP).")
     return detected
 
 
 def validate_imagefield(value: str) -> str:
     field = str(value).strip().lower()
     if not _FIELD_RE.match(field):
-        raise ValueError("Campo immagine non valido.")
+        raise ValueError("Invalid image field.")
     return field
 
 
 def validate_barcode(value: str) -> str:
     barcode = str(value).strip()
     if not _BARCODE_RE.match(barcode):
-        raise ValueError("Barcode non valido (8-14 cifre).")
+        raise ValueError("Invalid barcode (8-14 digits).")
     return barcode
 
 
@@ -102,15 +102,15 @@ def _http_post(request: urllib.request.Request, timeout: float) -> dict[str, Any
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
     except urllib.error.HTTPError as error:
-        raise OFFUploadError(f"Open Food Facts ha risposto HTTP {error.code}.") from error
+        raise OFFUploadError(f"Open Food Facts replied HTTP {error.code}.") from error
     except urllib.error.URLError as error:
-        raise OFFUploadError("Open Food Facts non raggiungibile.") from error
+        raise OFFUploadError("Open Food Facts is unreachable.") from error
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise OFFUploadError("Risposta non JSON da Open Food Facts.") from error
+        raise OFFUploadError("Non-JSON response from Open Food Facts.") from error
     if not isinstance(payload, dict):
-        raise OFFUploadError("Risposta inattesa da Open Food Facts.")
+        raise OFFUploadError("Unexpected response from Open Food Facts.")
     return payload
 
 
@@ -125,13 +125,13 @@ def upload_image(
     timeout: float = 30.0,
     transport: Callable[[urllib.request.Request], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Carica una foto e ritorna la risposta JSON di OFF.
+    """Upload one photo and return the JSON response from OFF.
 
-    `transport` e' iniettabile nei test: riceve la Request e ritorna il payload.
-    Le credenziali non compaiono mai nei messaggi di errore.
+    `transport` is injectable in tests: it receives the Request and returns the
+    payload. Credentials never appear in error messages.
     """
     if not user_id or not password:
-        raise OFFUploadError("Credenziali Open Food Facts mancanti.")
+        raise OFFUploadError("Missing Open Food Facts credentials.")
     barcode = validate_barcode(barcode)
     field = validate_imagefield(imagefield)
     detected = validate_image(image_bytes, content_type)
@@ -162,10 +162,10 @@ def upload_image(
         payload = _http_post(request, timeout) if transport is None else transport(request)
     except OFFUploadError:
         raise
-    except Exception as error:  # noqa: BLE001 - rete/trasporto: messaggio pulito
-        raise OFFUploadError("Errore di rete durante il caricamento.") from error
+    except Exception as error:  # noqa: BLE001 - network/transport: clean message
+        raise OFFUploadError("Network error during the upload.") from error
 
     status = str(payload.get("status", "")).strip().lower()
     if status not in {"status ok", "ok", "success"}:
-        raise OFFUploadError("Open Food Facts ha rifiutato la foto.")
+        raise OFFUploadError("Open Food Facts rejected the photo.")
     return payload
