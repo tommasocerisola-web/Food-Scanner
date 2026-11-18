@@ -19,7 +19,7 @@ solo sul loopback del telefono.
 - connessione Internet per cercare prodotti su Open Food Facts;
 - nessun account, nessuna chiave e nessun Termux.
 
-L'APK è compilato con `compileSdk 37`, `targetSdk 37`, `minSdk 26`.
+L'APK è compilato con `compileSdk 37.0`, `targetSdk 37`, `minSdk 26`.
 
 ## Installazione
 

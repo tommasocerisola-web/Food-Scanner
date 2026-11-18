@@ -24,7 +24,11 @@ val stageFoodScannerAssets = tasks.register<Sync>("stageFoodScannerAssets") {
 
 android {
     namespace = "com.foodscanner.app"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
 
     defaultConfig {
         applicationId = "com.foodscanner.app"

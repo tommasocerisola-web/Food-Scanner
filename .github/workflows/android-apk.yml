@@ -34,7 +34,7 @@ jobs:
           export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses > /dev/null 2>&1 || true
-          sdkmanager --sdk_root="$ANDROID_HOME" --install "platforms;android-37" "build-tools;36.0.0" "platform-tools"
+          sdkmanager --sdk_root="$ANDROID_HOME" --install "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"
           sdkmanager --sdk_root="$ANDROID_HOME" --list_installed
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
