@@ -1,0 +1,77 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - android-apk
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Food Scanner APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 17 SDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platforms;android-37" "build-tools;36.0.0" "platform-tools"
+          sdkmanager --list_installed
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Ensure Gradle 9.6
+        run: |
+          if ! command -v gradle >/dev/null 2>&1; then
+            curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-9.6.0-bin.zip
+            unzip -q /tmp/gradle.zip -d /opt
+            echo "/opt/gradle-9.6.0/bin" >> "$GITHUB_PATH"
+            export PATH="/opt/gradle-9.6.0/bin:$PATH"
+          fi
+          gradle --version
+
+      - name: Build APK
+        working-directory: android
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Inspect APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          ls -lh "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -12
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          cp "$APK" FoodScanner-0.3-beta.apk
+          sha256sum FoodScanner-0.3-beta.apk | tee FoodScanner-0.3-beta.apk.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoodScanner-0.3-beta
+          path: |
+            FoodScanner-0.3-beta.apk
+            FoodScanner-0.3-beta.apk.sha256
+          if-no-files-found: error
